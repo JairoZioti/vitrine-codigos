@@ -72,3 +72,4 @@ export const initialProducts = [
     link: 'https://mercadolivre.com.br'
   }
 ];
+

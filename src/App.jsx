@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   ShoppingBag,
   ExternalLink,
   ShieldCheck,
   Star,
-  Search
+  Search,
+  PlusCircle,
+  X,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
+import { supabase } from './lib/supabase';
 import { initialProducts } from './data/products';
-
-const products = initialProducts;
 
 const cssStyles = `
   /* Resets e Escopo */
@@ -73,6 +76,8 @@ const cssStyles = `
     display: flex;
     align-items: center;
     gap: 0.6rem;
+    cursor: pointer;
+    user-select: none;
   }
 
   .brand-icon-pill {
@@ -96,6 +101,12 @@ const cssStyles = `
     margin: 0;
   }
 
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
   .verified-badge {
     display: inline-flex;
     align-items: center;
@@ -107,6 +118,25 @@ const cssStyles = `
     font-size: 0.75rem;
     font-weight: 700;
     border-radius: 9999px;
+  }
+
+  .btn-add-product {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.75rem;
+    background: #0f172a;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .btn-add-product:hover {
+    background: #ea580c;
   }
 
   /* Barra de Busca */
@@ -471,7 +501,7 @@ const cssStyles = `
     max-width: 640px;
     width: 100%;
     margin: 0 auto;
-    padding-bottom: 130px; /* espaço para o botão fixo inferior */
+    padding-bottom: 130px;
   }
 
   .details-media-container {
@@ -557,7 +587,6 @@ const cssStyles = `
     color: #64748b;
   }
 
-  /* Bloco de Preço Detalhado */
   .details-pricing-card {
     background: #fff7ed;
     border: 1px solid #ffedd5;
@@ -604,7 +633,6 @@ const cssStyles = `
     text-transform: uppercase;
   }
 
-  /* Caixa de Garantia Visual */
   .security-card {
     display: flex;
     align-items: flex-start;
@@ -642,7 +670,6 @@ const cssStyles = `
     line-height: 1.35;
   }
 
-  /* Barra Fixa Inferior (Bottom Bar) */
   .bottom-action-bar {
     position: fixed;
     bottom: 0;
@@ -683,29 +710,233 @@ const cssStyles = `
 
   .btn-cta-buy:hover {
     filter: brightness(1.05);
-    box-shadow: 0 10px 24px -2px rgba(234, 88, 12, 0.55);
   }
 
   .btn-cta-buy:active {
     transform: scale(0.98);
-    filter: brightness(0.95);
   }
 
-  .btn-cta-buy svg {
-    flex-shrink: 0;
+  /* Modal do Painel de Cadastro Rápido */
+  .modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  .modal-card {
+    background: #ffffff;
+    border-radius: 20px;
+    width: 100%;
+    max-width: 520px;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 1.5rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+
+  .modal-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .btn-close-modal {
+    background: #f1f5f9;
+    border: none;
+    padding: 0.4rem;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #64748b;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 0.4rem;
+  }
+
+  .form-input, .form-select {
+    width: 100%;
+    padding: 0.75rem 0.9rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    color: #0f172a;
+    outline: none;
+    transition: border 0.2s;
+  }
+
+  .form-input:focus, .form-select:focus {
+    border-color: #ea580c;
+  }
+
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .btn-submit-product {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.9rem;
+    background: #ea580c;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: background 0.2s;
+  }
+
+  .btn-submit-product:hover {
+    background: #c2410c;
   }
 `;
 
 export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [productsList, setProductsList] = useState(initialProducts);
+  const [loading, setLoading] = useState(true);
+
+  // Estado do Modal de Cadastro
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    code: '',
+    name: '',
+    image: '',
+    price: '',
+    old_price: '',
+    platform: 'Shopee',
+    link: ''
+  });
+
+  // 1. Carregar produtos do Supabase
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('code', { ascending: true });
+
+      if (error) {
+        console.error('Erro ao buscar do Supabase:', error);
+      } else if (data && data.length > 0) {
+        // Normaliza campos caso venham com old_price
+        const formatted = data.map((item) => ({
+          ...item,
+          oldPrice: item.old_price || item.oldPrice
+        }));
+        setProductsList(formatted);
+      }
+    } catch (err) {
+      console.error('Erro de conexão:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+
+    // 2. Realtime Subscription: Sincronização em tempo real!
+    const channel = supabase
+      .channel('public:products')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          fetchProducts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // 3. Cadastrar novo produto
+  const handleCreateProduct = async (e) => {
+    e.preventDefault();
+    if (!newProduct.code || !newProduct.name || !newProduct.price || !newProduct.link) {
+      alert('Por favor, preencha todos os campos obrigatórios (Código, Nome, Preço e Link)!');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('products').insert([
+        {
+          code: newProduct.code.trim(),
+          name: newProduct.name.trim(),
+          image: newProduct.image.trim() || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80',
+          price: newProduct.price.trim(),
+          old_price: newProduct.old_price.trim() || null,
+          platform: newProduct.platform,
+          link: newProduct.link.trim(),
+          rating: 4.9,
+          reviews: 150
+        }
+      ]);
+
+      if (error) {
+        alert('Erro ao salvar produto: ' + error.message);
+      } else {
+        setIsModalOpen(false);
+        setNewProduct({
+          code: '',
+          name: '',
+          image: '',
+          price: '',
+          old_price: '',
+          platform: 'Shopee',
+          link: ''
+        });
+        await fetchProducts();
+      }
+    } catch (err) {
+      alert('Erro inesperado: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const cleanSearch = searchTerm.trim().toLowerCase();
 
-  const filteredProducts = products.filter((item) => {
+  const filteredProducts = productsList.filter((item) => {
     if (!cleanSearch) return true;
-    const matchCode = item.code.toLowerCase().includes(cleanSearch);
-    const matchName = item.name.toLowerCase().includes(cleanSearch);
+    const matchCode = item.code?.toLowerCase().includes(cleanSearch);
+    const matchName = item.name?.toLowerCase().includes(cleanSearch);
     return matchCode || matchName;
   });
 
@@ -717,15 +948,26 @@ export default function App() {
       <header className="header-fixed">
         <div className="header-inner">
           <div className="header-brand">
-            <div className="brand-title-wrap">
+            <div className="brand-title-wrap" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
               <div className="brand-icon-pill">
                 <ShoppingBag size={20} strokeWidth={2.5} />
               </div>
               <h1 className="header-title">Vitrine Oficial</h1>
             </div>
-            <div className="verified-badge">
-              <ShieldCheck size={14} strokeWidth={2.5} />
-              <span>Itens Verificados</span>
+
+            <div className="header-actions">
+              <button
+                className="btn-add-product"
+                onClick={() => setIsModalOpen(true)}
+                title="Cadastrar novo produto na vitrine"
+              >
+                <PlusCircle size={15} strokeWidth={2.5} />
+                <span>+ Produto</span>
+              </button>
+              <div className="verified-badge">
+                <ShieldCheck size={14} strokeWidth={2.5} />
+                <span>Verificados</span>
+              </div>
             </div>
           </div>
 
@@ -768,7 +1010,12 @@ export default function App() {
           )}
         </div>
 
-        {filteredProducts.length === 0 ? (
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '3rem 0', color: '#ea580c' }}>
+            <Loader2 size={36} className="animate-spin" style={{ margin: '0 auto', animation: 'spin 1s linear infinite' }} />
+            <p style={{ marginTop: '0.85rem', color: '#64748b', fontWeight: '600' }}>Carregando vitrine em tempo real...</p>
+          </div>
+        ) : filteredProducts.length === 0 ? (
           <div className="empty-state">
             <h3 className="empty-title">Nenhum produto encontrado</h3>
             <p className="empty-desc">
@@ -785,7 +1032,7 @@ export default function App() {
           <div className="catalog-grid">
             {filteredProducts.map((product) => (
               <article
-                key={product.id}
+                key={product.id || product.code}
                 className="product-card"
                 onClick={() => {
                   setSelectedProduct(product);
@@ -793,7 +1040,6 @@ export default function App() {
                 }}
               >
                 <div className="card-media">
-                  {/* Badge de alto contraste no canto superior esquerdo */}
                   <div className="code-badge">
                     <span>CÓD: {product.code}</span>
                   </div>
@@ -820,10 +1066,10 @@ export default function App() {
                   <div className="card-rating-row">
                     <span className="star-badge">
                       <Star size={14} fill="#eab308" color="#eab308" />
-                      {product.rating}
+                      {product.rating || 4.8}
                     </span>
                     <span>•</span>
-                    <span>({product.reviews} avaliações)</span>
+                    <span>({product.reviews || 120} avaliações)</span>
                   </div>
 
                   <h2 className="card-title" title={product.name}>
@@ -831,7 +1077,9 @@ export default function App() {
                   </h2>
 
                   <div className="card-pricing">
-                    <div className="card-old-price">R$ {product.oldPrice}</div>
+                    {product.oldPrice && (
+                      <div className="card-old-price">R$ {product.oldPrice}</div>
+                    )}
                     <div className="card-price-row">
                       <span className="price-currency">R$</span>
                       <span className="price-value">{product.price}</span>
@@ -849,7 +1097,121 @@ export default function App() {
         )}
       </main>
 
-      {/* TELA DE DETALHES EM TELA CHEIA (MODAL / OVERLAY) */}
+      {/* MODAL DE CADASTRO RÁPIDO (+ PRODUTO) */}
+      {isModalOpen && (
+        <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Cadastrar Novo Produto</h3>
+              <button className="btn-close-modal" onClick={() => setIsModalOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateProduct}>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Código (Ex: 007) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="007"
+                    className="form-input"
+                    value={newProduct.code}
+                    onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Plataforma *</label>
+                  <select
+                    className="form-select"
+                    value={newProduct.platform}
+                    onChange={(e) => setNewProduct({ ...newProduct, platform: e.target.value })}
+                  >
+                    <option value="Shopee">Shopee</option>
+                    <option value="Mercado Livre">Mercado Livre</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Nome Completo do Produto *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Luminária de Mesa Articulada LED"
+                  className="form-input"
+                  value={newProduct.name}
+                  onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                />
+              </div>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Preço Atual (R$) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="79,90"
+                    className="form-input"
+                    value={newProduct.price}
+                    onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Preço Antigo / Riscado</label>
+                  <input
+                    type="text"
+                    placeholder="120,00"
+                    className="form-input"
+                    value={newProduct.old_price}
+                    onChange={(e) => setNewProduct({ ...newProduct, old_price: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Link da Imagem (URL)</label>
+                <input
+                  type="url"
+                  placeholder="https://..."
+                  className="form-input"
+                  value={newProduct.image}
+                  onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Seu Link de Afiliado *</label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://shope.ee/... ou https://mercadolivre.com/..."
+                  className="form-input"
+                  value={newProduct.link}
+                  onChange={(e) => setNewProduct({ ...newProduct, link: e.target.value })}
+                />
+              </div>
+
+              <button type="submit" disabled={saving} className="btn-submit-product">
+                {saving ? (
+                  <>
+                    <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                    <span>Salvando...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={18} />
+                    <span>Cadastrar na Vitrine</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* TELA DE DETALHES EM TELA CHEIA */}
       {selectedProduct && (
         <div className="details-overlay">
           <header className="details-nav">
@@ -864,7 +1226,7 @@ export default function App() {
             <span className="nav-center-info">
               CÓD: {selectedProduct.code}
             </span>
-            <div style={{ width: 80 }} /> {/* Balanço do header */}
+            <div style={{ width: 80 }} />
           </header>
 
           <div className="details-body">
@@ -899,30 +1261,30 @@ export default function App() {
 
               <h2 className="details-title">{selectedProduct.name}</h2>
 
-              {/* Avaliação por estrelas */}
               <div className="details-reviews-row">
                 <div className="stars-group">
                   {[...Array(5)].map((_, i) => (
                     <Star
                       key={i}
                       size={17}
-                      fill={i < Math.floor(selectedProduct.rating) ? '#f59e0b' : 'none'}
+                      fill={i < Math.floor(selectedProduct.rating || 4.8) ? '#f59e0b' : 'none'}
                       color="#f59e0b"
                       strokeWidth={2}
                     />
                   ))}
                 </div>
-                <span className="rating-score">{selectedProduct.rating}</span>
+                <span className="rating-score">{selectedProduct.rating || 4.8}</span>
                 <span className="reviews-count">
-                  ({selectedProduct.reviews} clientes satisfeitos)
+                  ({selectedProduct.reviews || 120} clientes satisfeitos)
                 </span>
               </div>
 
-              {/* Preço riscado e preço atual em destaque */}
               <div className="details-pricing-card">
-                <div className="details-old-price-line">
-                  De: R$ {selectedProduct.oldPrice}
-                </div>
+                {selectedProduct.oldPrice && (
+                  <div className="details-old-price-line">
+                    De: R$ {selectedProduct.oldPrice}
+                  </div>
+                )}
                 <div className="details-main-price">
                   <span className="curr">R$</span>
                   <span className="amount">{selectedProduct.price}</span>
@@ -932,7 +1294,6 @@ export default function App() {
                 </span>
               </div>
 
-              {/* Caixa de garantia visual */}
               <div className="security-card">
                 <div className="security-icon-circle">
                   <ShieldCheck size={22} strokeWidth={2.5} />
