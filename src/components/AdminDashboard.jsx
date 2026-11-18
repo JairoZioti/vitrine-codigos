@@ -10,6 +10,7 @@ import {
   AlertCircle,
   RefreshCw,
   PlusCircle,
+  Pencil,
   Tag
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -442,6 +443,34 @@ const dashboardStyles = `
     background: #f59e0b;
   }
 
+  /* Botão de Ação na Listagem (Editar) */
+  .btn-admin-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.65rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: #ffffff;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    transition: all 0.2s ease;
+  }
+
+  .btn-admin-action:hover {
+    background: #f8fafc;
+    color: #0f172a;
+    border-color: #94a3b8;
+  }
+
+  .btn-admin-action:active {
+    background: #f1f5f9;
+    transform: scale(0.98);
+  }
+
   /* Apresentação Compacta em Cards para Celular */
   .admin-mobile-list {
     display: none;
@@ -532,9 +561,11 @@ export default function AdminDashboard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
 
   // Consulta administrativa à tabela 'products'
   // NÃO filtra por is_active = true para permitir visualização de publicados e rascunhos
+  // Inclui todos os campos necessários para exibição e edição (old_price, link, etc.)
   const fetchAdminProducts = async () => {
     try {
       setLoading(true);
@@ -542,7 +573,7 @@ export default function AdminDashboard({
 
       const { data, error: queryError } = await supabase
         .from('products')
-        .select('id, code, name, image, price, platform, is_active, created_at')
+        .select('id, code, name, image, price, old_price, platform, link, is_active, created_at')
         .order('created_at', { ascending: false });
 
       if (queryError) {
@@ -563,8 +594,20 @@ export default function AdminDashboard({
     fetchAdminProducts();
   }, []);
 
-  const handleProductCreated = () => {
+  const handleProductSaved = () => {
+    setIsFormOpen(false);
+    setEditingProduct(null);
     fetchAdminProducts();
+  };
+
+  const handleOpenCreate = () => {
+    setEditingProduct(null);
+    setIsFormOpen(true);
+  };
+
+  const handleOpenEdit = (product) => {
+    setEditingProduct(product);
+    setIsFormOpen(true);
   };
 
   return (
@@ -595,7 +638,7 @@ export default function AdminDashboard({
             <button
               type="button"
               className="btn-admin-header btn-admin-primary"
-              onClick={() => setIsFormOpen(true)}
+              onClick={handleOpenCreate}
               title="Cadastrar novo produto como rascunho"
             >
               <PlusCircle size={16} strokeWidth={2.5} />
@@ -704,6 +747,7 @@ export default function AdminDashboard({
                         <th style={{ width: '120px' }}>Preço</th>
                         <th style={{ width: '130px' }}>Marketplace</th>
                         <th style={{ width: '120px' }}>Status</th>
+                        <th style={{ width: '85px', textAlign: 'center' }}>Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -755,6 +799,17 @@ export default function AdminDashboard({
                               <span>{prod.is_active ? 'Publicado' : 'Rascunho'}</span>
                             </span>
                           </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              className="btn-admin-action"
+                              onClick={() => handleOpenEdit(prod)}
+                              title={`Editar produto CÓD: ${prod.code}`}
+                            >
+                              <Pencil size={13} strokeWidth={2.2} />
+                              <span>Editar</span>
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -805,6 +860,15 @@ export default function AdminDashboard({
                           >
                             {prod.platform}
                           </span>
+                          <button
+                            type="button"
+                            className="btn-admin-action"
+                            onClick={() => handleOpenEdit(prod)}
+                            title={`Editar produto CÓD: ${prod.code}`}
+                          >
+                            <Pencil size={13} strokeWidth={2.2} />
+                            <span>Editar</span>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -816,11 +880,15 @@ export default function AdminDashboard({
         </div>
       </main>
 
-      {/* FORMULÁRIO MODAL DE CADASTRO DE PRODUTO COMO RASCUNHO */}
+      {/* FORMULÁRIO MODAL DE CADASTRO OU EDIÇÃO DE PRODUTO */}
       <AdminProductForm
         isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        onProductCreated={handleProductCreated}
+        initialProduct={editingProduct}
+        onClose={() => {
+          setIsFormOpen(false);
+          setEditingProduct(null);
+        }}
+        onProductSaved={handleProductSaved}
       />
     </div>
   );

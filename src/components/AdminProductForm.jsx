@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Loader2,
   CheckCircle2,
   AlertCircle,
   PackagePlus,
+  Pencil,
   HelpCircle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -265,14 +266,62 @@ function isValidHttpUrl(urlString) {
 }
 
 /**
+ * Validador e normalizador de preço no formato brasileiro (ex: "79,90")
+ * Aceita "79,90", "79.90", "1.299,00", "1299,00", etc.
+ * @param {string} raw
+ * @returns {{ valid: boolean, formatted: string }}
+ */
+function formatAndValidatePrice(raw) {
+  if (!raw || typeof raw !== 'string') return { valid: false, formatted: '' };
+
+  let val = raw.trim();
+  // Remove prefixos como "R$" ou "r$" se existirem
+  val = val.replace(/^R\$\s*/i, '').trim();
+
+  if (!val) return { valid: false, formatted: '' };
+
+  // Se o usuário digitou com ponto no lugar de vírgula decimal (ex: "79.90")
+  if (val.includes('.') && !val.includes(',')) {
+    val = val.replace('.', ',');
+  }
+
+  // Validação por Regex: dígitos opcionais com separador de milhar e exatamente duas casas decimais após vírgula
+  // Ex: "79,90" ou "1.299,00" ou "9,99"
+  const priceRegex = /^\d{1,3}(\.\d{3})*,\d{2}$|^\d+,\d{2}$/;
+  if (priceRegex.test(val)) {
+    return { valid: true, formatted: val };
+  }
+
+  // Se digitou inteiro sem vírgula (ex: "79"), formata para "79,00"
+  if (/^\d+$/.test(val)) {
+    return { valid: true, formatted: `${val},00` };
+  }
+
+  // Se digitou com 1 casa decimal (ex: "79,9"), completa para "79,90"
+  if (/^\d+,\d{1}$/.test(val)) {
+    return { valid: true, formatted: `${val}0` };
+  }
+
+  return { valid: false, formatted: val };
+}
+
+/**
  * Componente AdminProductForm
  * 
  * Props:
  * - isOpen: boolean
  * - onClose: function() => void
- * - onProductCreated: function(newProduct) => void
+ * - onProductSaved: function(product) => void
+ * - initialProduct: object | null (quando fornecido, opera em modo de EDIÇÃO)
  */
-export default function AdminProductForm({ isOpen, onClose, onProductCreated }) {
+export default function AdminProductForm({
+  isOpen,
+  onClose,
+  onProductSaved,
+  initialProduct = null
+}) {
+  const isEditing = Boolean(initialProduct && initialProduct.id);
+
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -286,6 +335,35 @@ export default function AdminProductForm({ isOpen, onClose, onProductCreated }) 
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+
+  // Carrega os dados do produto quando entra em modo de edição ou reseta ao abrir para novo cadastro
+  useEffect(() => {
+    if (isOpen) {
+      if (initialProduct) {
+        setFormData({
+          code: initialProduct.code || '',
+          name: initialProduct.name || '',
+          price: initialProduct.price || '',
+          old_price: initialProduct.old_price || initialProduct.oldPrice || '',
+          platform: initialProduct.platform || 'Shopee',
+          image: initialProduct.image || '',
+          link: initialProduct.link || ''
+        });
+      } else {
+        setFormData({
+          code: '',
+          name: '',
+          price: '',
+          old_price: '',
+          platform: 'Shopee',
+          image: '',
+          link: ''
+        });
+      }
+      setErrorMessage(null);
+      setSuccessMessage(null);
+    }
+  }, [isOpen, initialProduct]);
 
   if (!isOpen) return null;
 
@@ -317,10 +395,24 @@ export default function AdminProductForm({ isOpen, onClose, onProductCreated }) 
       return;
     }
 
-    const trimmedPrice = formData.price.trim();
-    if (!trimmedPrice) {
-      setErrorMessage('O preço atual é obrigatório.');
+    // Validação e padronização monetária do preço atual
+    const priceValidation = formatAndValidatePrice(formData.price);
+    if (!priceValidation.valid) {
+      setErrorMessage('Preço atual inválido. Utilize o formato brasileiro, ex: "79,90".');
       return;
+    }
+    const validatedPrice = priceValidation.formatted;
+
+    // Validação e padronização monetária do preço anterior (opcional)
+    let validatedOldPrice = null;
+    const trimmedOldPrice = formData.old_price ? formData.old_price.trim() : '';
+    if (trimmedOldPrice) {
+      const oldPriceValidation = formatAndValidatePrice(trimmedOldPrice);
+      if (!oldPriceValidation.valid) {
+        setErrorMessage('Preço anterior inválido. Utilize o formato brasileiro, ex: "119,90", ou deixe em branco.');
+        return;
+      }
+      validatedOldPrice = oldPriceValidation.formatted;
     }
 
     const trimmedImage = formData.image.trim();
@@ -343,49 +435,101 @@ export default function AdminProductForm({ isOpen, onClose, onProductCreated }) 
       return;
     }
 
-    const trimmedOldPrice = formData.old_price.trim();
-
     setSaving(true);
 
     try {
-      // Inserção com is_active explicitamente false (Rascunho)
-      const payload = {
-        code: trimmedCode,
-        name: trimmedName,
-        price: trimmedPrice,
-        old_price: trimmedOldPrice || null,
-        platform: formData.platform,
-        image: trimmedImage,
-        link: trimmedLink,
-        is_active: false // Regra obrigatória: novo cadastro é sempre rascunho
-      };
+      if (isEditing) {
+        // MODO EDIÇÃO: Atualiza exclusivamente os campos cadastrais filtrando por id
+        // Regra estrita: NÃO altera is_active, id, created_at, rating ou reviews
+        const updatePayload = {
+          code: trimmedCode,
+          name: trimmedName,
+          price: validatedPrice,
+          old_price: validatedOldPrice,
+          platform: formData.platform,
+          image: trimmedImage,
+          link: trimmedLink
+        };
 
-      const { data, error } = await supabase
-        .from('products')
-        .insert([payload])
-        .select()
-        .single();
+        const { data: updatedRow, error: updateError } = await supabase
+          .from('products')
+          .update(updatePayload)
+          .eq('id', initialProduct.id)
+          .select('id')
+          .single();
 
-      if (error) {
-        if (error.code === '23505') {
-          setErrorMessage(`Já existe um produto cadastrado com o código "${trimmedCode}".`);
-        } else {
-          setErrorMessage(error.message || 'Erro ao cadastrar produto no banco.');
+        if (updateError) {
+          // Código 23505: violação de unicidade (código duplicado)
+          if (updateError.code === '23505') {
+            setErrorMessage(`Já existe outro produto cadastrado com o código "${trimmedCode}".`);
+          // Código PGRST116: nenhuma linha correspondeu ao filtro — registro não encontrado
+          } else if (updateError.code === 'PGRST116') {
+            setErrorMessage('O produto não foi encontrado. Pode ter sido removido. Recarregue a listagem e tente novamente.');
+          } else {
+            setErrorMessage(updateError.message || 'Erro ao atualizar produto no banco.');
+          }
+          return;
         }
-        return;
+
+        // Garantia adicional: só confirma sucesso se o Supabase retornou o id do registro atualizado
+        if (!updatedRow?.id) {
+          setErrorMessage('A atualização não pôde ser confirmada pelo servidor. Recarregue a listagem antes de tentar novamente.');
+          return;
+        }
+
+        setSuccessMessage('Alterações salvas com sucesso!');
+
+        if (onProductSaved) {
+          onProductSaved();
+        }
+
+        setTimeout(() => {
+          onClose();
+        }, 700);
+      } else {
+        // MODO NOVO CADASTRO: Inserção com is_active explicitamente false (Rascunho)
+        const insertPayload = {
+          code: trimmedCode,
+          name: trimmedName,
+          price: validatedPrice,
+          old_price: validatedOldPrice,
+          platform: formData.platform,
+          image: trimmedImage,
+          link: trimmedLink,
+          is_active: false // Regra obrigatória: novo produto sempre nasce como rascunho
+        };
+
+        const { data: insertedRow, error: insertError } = await supabase
+          .from('products')
+          .insert([insertPayload])
+          .select('id')
+          .single();
+
+        if (insertError) {
+          if (insertError.code === '23505') {
+            setErrorMessage(`Já existe um produto cadastrado com o código "${trimmedCode}".`);
+          } else {
+            setErrorMessage(insertError.message || 'Erro ao cadastrar produto no banco.');
+          }
+          return;
+        }
+
+        // Garantia adicional: só confirma sucesso se o Supabase retornou o id do registro inserido
+        if (!insertedRow?.id) {
+          setErrorMessage('O cadastro não pôde ser confirmado pelo servidor. Verifique a listagem antes de tentar novamente.');
+          return;
+        }
+
+        setSuccessMessage('Produto cadastrado com sucesso como rascunho!');
+
+        if (onProductSaved) {
+          onProductSaved();
+        }
+
+        setTimeout(() => {
+          onClose();
+        }, 700);
       }
-
-      setSuccessMessage('Produto cadastrado com sucesso como rascunho!');
-
-      // Notifica o componente pai para atualizar a listagem
-      if (onProductCreated) {
-        onProductCreated(data);
-      }
-
-      // Fecha o modal após breve confirmação
-      setTimeout(() => {
-        onClose();
-      }, 700);
     } catch (err) {
       setErrorMessage(err.message || 'Falha inesperada ao comunicar com o banco.');
     } finally {
@@ -401,12 +545,16 @@ export default function AdminProductForm({ isOpen, onClose, onProductCreated }) 
         <div className="admin-modal-header">
           <div className="admin-modal-title-wrap">
             <div className="admin-modal-icon-badge">
-              <PackagePlus size={20} strokeWidth={2.4} />
+              {isEditing ? <Pencil size={20} strokeWidth={2.4} /> : <PackagePlus size={20} strokeWidth={2.4} />}
             </div>
             <div>
-              <h3 className="admin-modal-title">Novo Produto</h3>
+              <h3 className="admin-modal-title">
+                {isEditing ? `Editar Produto (CÓD: ${initialProduct.code})` : 'Novo Produto'}
+              </h3>
               <p className="admin-modal-subtitle">
-                O produto será salvo como rascunho e não aparecerá na vitrine pública até ser aprovado.
+                {isEditing
+                  ? 'Altere as informações do produto. O status de publicação atual será preservado.'
+                  : 'O produto será salvo como rascunho e não aparecerá na vitrine pública até ser aprovado.'}
               </p>
             </div>
           </div>
@@ -435,10 +583,12 @@ export default function AdminProductForm({ isOpen, onClose, onProductCreated }) 
           </div>
         )}
 
-        <div className="admin-draft-notice">
-          <HelpCircle size={16} style={{ flexShrink: 0 }} />
-          <span>Status inicial automático: <strong>Rascunho</strong> (invisível para clientes).</span>
-        </div>
+        {!isEditing && (
+          <div className="admin-draft-notice">
+            <HelpCircle size={16} style={{ flexShrink: 0 }} />
+            <span>Status inicial automático: <strong>Rascunho</strong> (invisível para clientes).</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="admin-form-grid-2">
@@ -457,7 +607,7 @@ export default function AdminProductForm({ isOpen, onClose, onProductCreated }) 
                 value={formData.code}
                 onChange={handleChange}
                 disabled={saving}
-                autoFocus
+                autoFocus={!isEditing}
               />
               <p className="admin-form-note">Identificador único exibido no vídeo (máx. 10 caracteres).</p>
             </div>
@@ -584,12 +734,12 @@ export default function AdminProductForm({ isOpen, onClose, onProductCreated }) 
               {saving ? (
                 <>
                   <Loader2 size={16} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
-                  <span>Cadastrando...</span>
+                  <span>{isEditing ? 'Salvando...' : 'Cadastrando...'}</span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 size={16} />
-                  <span>Salvar como Rascunho</span>
+                  <span>{isEditing ? 'Salvar Alterações' : 'Salvar como Rascunho'}</span>
                 </>
               )}
             </button>
@@ -599,4 +749,3 @@ export default function AdminProductForm({ isOpen, onClose, onProductCreated }) 
     </div>
   );
 }
-
