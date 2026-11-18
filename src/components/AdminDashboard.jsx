@@ -9,9 +9,11 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  PlusCircle,
   Tag
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import AdminProductForm from './AdminProductForm';
 
 const dashboardStyles = `
   .admin-dashboard-layout {
@@ -86,6 +88,18 @@ const dashboardStyles = `
     display: flex;
     align-items: center;
     gap: 0.65rem;
+  }
+
+  .btn-admin-primary {
+    background: #ea580c;
+    color: #ffffff;
+    border-color: #ea580c;
+    box-shadow: 0 2px 4px rgba(234, 88, 12, 0.2);
+  }
+
+  .btn-admin-primary:hover {
+    background: #c2410c;
+    border-color: #c2410c;
   }
 
   .admin-user-pill {
@@ -517,6 +531,7 @@ export default function AdminDashboard({
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   // Consulta administrativa à tabela 'products'
   // NÃO filtra por is_active = true para permitir visualização de publicados e rascunhos
@@ -548,6 +563,10 @@ export default function AdminDashboard({
     fetchAdminProducts();
   }, []);
 
+  const handleProductCreated = () => {
+    fetchAdminProducts();
+  };
+
   return (
     <div className="admin-dashboard-layout">
       <style>{dashboardStyles}</style>
@@ -572,6 +591,16 @@ export default function AdminDashboard({
                 <span>{adminEmail}</span>
               </div>
             )}
+
+            <button
+              type="button"
+              className="btn-admin-header btn-admin-primary"
+              onClick={() => setIsFormOpen(true)}
+              title="Cadastrar novo produto como rascunho"
+            >
+              <PlusCircle size={16} strokeWidth={2.5} />
+              <span>Novo produto</span>
+            </button>
 
             <button
               type="button"
@@ -786,6 +815,13 @@ export default function AdminDashboard({
           </div>
         </div>
       </main>
+
+      {/* FORMULÁRIO MODAL DE CADASTRO DE PRODUTO COMO RASCUNHO */}
+      <AdminProductForm
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        onProductCreated={handleProductCreated}
+      />
     </div>
   );
 }
