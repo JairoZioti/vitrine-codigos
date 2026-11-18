@@ -9,10 +9,12 @@ import {
   PlusCircle,
   X,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  PackageOpen
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
-import { initialProducts } from './data/products';
 
 const cssStyles = `
   /* Resets e Escopo */
@@ -408,7 +410,7 @@ const cssStyles = `
     border-color: #ea580c;
   }
 
-  /* Empty State */
+  /* Empty State & Error State */
   .empty-state {
     text-align: center;
     padding: 3.5rem 1.5rem;
@@ -417,6 +419,26 @@ const cssStyles = `
     border: 1px dashed #cbd5e1;
     max-width: 480px;
     margin: 2rem auto;
+  }
+
+  .state-icon-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    margin-bottom: 1rem;
+  }
+
+  .state-icon-empty {
+    background: #f1f5f9;
+    color: #64748b;
+  }
+
+  .state-icon-error {
+    background: #fef2f2;
+    color: #ef4444;
   }
 
   .empty-title {
@@ -442,6 +464,28 @@ const cssStyles = `
     font-size: 0.875rem;
     font-weight: 600;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .btn-retry {
+    background: #ea580c;
+    color: #ffffff;
+    border: none;
+    padding: 0.65rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: background 0.2s;
+  }
+
+  .btn-retry:hover {
+    background: #c2410c;
   }
 
   /* Tela de Detalhes em Tela Cheia */
@@ -824,8 +868,9 @@ const cssStyles = `
 export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [productsList, setProductsList] = useState(initialProducts);
+  const [productsList, setProductsList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
 
   // Estado do Modal de Cadastro
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -843,6 +888,9 @@ export default function App() {
   // 1. Carregar produtos do Supabase
   const fetchProducts = async () => {
     try {
+      setLoading(true);
+      setErrorMessage(null);
+
       const { data, error } = await supabase
         .from('products')
         .select('*')
@@ -850,7 +898,8 @@ export default function App() {
 
       if (error) {
         console.error('Erro ao buscar do Supabase:', error);
-      } else if (data && data.length > 0) {
+        setErrorMessage('Não foi possível carregar os produtos no momento.');
+      } else if (data) {
         // Normaliza campos caso venham com old_price
         const formatted = data.map((item) => ({
           ...item,
@@ -860,6 +909,7 @@ export default function App() {
       }
     } catch (err) {
       console.error('Erro de conexão:', err);
+      setErrorMessage('Falha na comunicação com o servidor.');
     } finally {
       setLoading(false);
     }
@@ -1011,9 +1061,36 @@ export default function App() {
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '3rem 0', color: '#ea580c' }}>
+          <div style={{ textAlign: 'center', padding: '3.5rem 0', color: '#ea580c' }}>
             <Loader2 size={36} className="animate-spin" style={{ margin: '0 auto', animation: 'spin 1s linear infinite' }} />
             <p style={{ marginTop: '0.85rem', color: '#64748b', fontWeight: '600' }}>Carregando vitrine em tempo real...</p>
+          </div>
+        ) : errorMessage ? (
+          <div className="empty-state">
+            <div className="state-icon-wrap state-icon-error">
+              <AlertCircle size={28} strokeWidth={2.2} />
+            </div>
+            <h3 className="empty-title">Instabilidade na conexão</h3>
+            <p className="empty-desc">
+              {errorMessage} Por favor, verifique sua conexão ou tente novamente.
+            </p>
+            <button
+              className="btn-retry"
+              onClick={() => fetchProducts()}
+            >
+              <RefreshCw size={15} strokeWidth={2.2} />
+              <span>Tentar novamente</span>
+            </button>
+          </div>
+        ) : productsList.length === 0 ? (
+          <div className="empty-state">
+            <div className="state-icon-wrap state-icon-empty">
+              <PackageOpen size={28} strokeWidth={2.2} />
+            </div>
+            <h3 className="empty-title">Nenhum produto cadastrado</h3>
+            <p className="empty-desc">
+              Novas ofertas e códigos serão publicados em breve nesta vitrine.
+            </p>
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="empty-state">
