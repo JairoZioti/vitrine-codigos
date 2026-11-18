@@ -12,9 +12,13 @@ import {
   CheckCircle2,
   AlertCircle,
   RefreshCw,
-  PackageOpen
+  PackageOpen,
+  LogOut,
+  Lock
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
+import { loginWithPassword, logout, verifyAdminStatus } from './lib/auth.js';
+import AdminLogin from './components/AdminLogin.jsx';
 
 const cssStyles = `
   /* Resets e Escopo */
@@ -863,16 +867,118 @@ const cssStyles = `
   .btn-submit-product:hover {
     background: #c2410c;
   }
+
+  /* Painel Administrativo Provisório */
+  .admin-temp-panel {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 1rem;
+    background-color: #f8fafc;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #0f172a;
+    box-sizing: border-box;
+  }
+
+  .admin-temp-card {
+    width: 100%;
+    max-width: 480px;
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 2.5rem 2rem;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+    border: 1px solid #e2e8f0;
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  .admin-temp-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: #ecfdf5;
+    color: #059669;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.15);
+  }
+
+  .admin-temp-title {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+  }
+
+  .admin-temp-desc {
+    font-size: 0.9rem;
+    color: #64748b;
+    line-height: 1.5;
+    margin-bottom: 2rem;
+  }
+
+  .admin-temp-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .btn-admin-temp-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.85rem 1.25rem;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    text-decoration: none;
+  }
+
+  .btn-admin-temp-primary {
+    background: #0f172a;
+    color: #ffffff;
+  }
+
+  .btn-admin-temp-primary:hover {
+    background: #1e293b;
+  }
+
+  .btn-admin-temp-danger {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1.5px solid #fecaca;
+  }
+
+  .btn-admin-temp-danger:hover {
+    background: #fee2e2;
+  }
 `;
 
 export default function App() {
+  // Roteamento leve via hash (#admin)
+  const [currentHash, setCurrentHash] = useState(() => window.location.hash);
+
+  // Estados de Autenticação e Autorização Administrativa
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState(null);
+
+  // Estados da Vitrine Pública
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productsList, setProductsList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
 
-  // Estado do Modal de Cadastro
+  // Estado do Modal de Cadastro (Legado / Reservado para área admin)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [newProduct, setNewProduct] = useState({
@@ -885,7 +991,143 @@ export default function App() {
     link: ''
   });
 
-  // 1. Carregar produtos do Supabase
+  // 1. Ouvinte de hashchange para suporte a Voltar/Avançar do navegador
+  useEffect(() => {
+    const handleHashChange = () => {
+      setCurrentHash(window.location.hash);
+      setAuthError(null);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, []);
+
+  // 2. Validação segura e restauração de sessão de administrador
+  const checkAdminAccess = async () => {
+    try {
+      setIsAuthLoading(true);
+      setAuthError(null);
+
+      const { isAdmin, error } = await verifyAdminStatus();
+
+      if (error) {
+        setIsAdminAuthenticated(false);
+        setAuthError(error);
+        return;
+      }
+
+      if (isAdmin === true) {
+        setIsAdminAuthenticated(true);
+        setAuthError(null);
+      } else {
+        // Usuário sem privilégios ou não logado
+        setIsAdminAuthenticated(false);
+      }
+    } catch (err) {
+      setIsAdminAuthenticated(false);
+      setAuthError(err.message || 'Erro inesperado ao verificar autorização.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  // Restaura/verifica sessão administrativa ao carregar ou entrar em #admin
+  useEffect(() => {
+    if (currentHash === '#admin') {
+      checkAdminAccess();
+    }
+  }, [currentHash]);
+
+  // Listener para sincronização de estado com Supabase Auth
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setIsAdminAuthenticated(false);
+        setAuthError(null);
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // Agenda a checagem fora do callback síncrono
+        setTimeout(() => {
+          if (window.location.hash === '#admin') {
+            checkAdminAccess();
+          }
+        }, 0);
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  // 3. Login administrativo seguro
+  const handleAdminLogin = async ({ email, password }) => {
+    setIsAuthLoading(true);
+    setAuthError(null);
+
+    try {
+      // Passo A: autentica credenciais com Supabase Auth
+      const { user, error: loginErr } = await loginWithPassword(email, password);
+      if (loginErr || !user) {
+        setIsAdminAuthenticated(false);
+        setAuthError(loginErr || 'E-mail ou senha incorretos.');
+        setIsAuthLoading(false);
+        return;
+      }
+
+      // Passo B: validação obrigatória contra RPC check_is_admin
+      const { isAdmin, error: adminErr } = await verifyAdminStatus();
+
+      if (adminErr) {
+        setIsAdminAuthenticated(false);
+        setAuthError(adminErr);
+        // Encerra a sessão em caso de erro na autorização
+        await logout();
+        setIsAuthLoading(false);
+        return;
+      }
+
+      if (isAdmin === true) {
+        setIsAdminAuthenticated(true);
+        setAuthError(null);
+      } else {
+        // Autenticado, porém sem permissão na tabela app_admins
+        setIsAdminAuthenticated(false);
+        setAuthError('Acesso não autorizado. Esta conta não possui privilégios de administrador.');
+        await logout();
+      }
+    } catch (err) {
+      setIsAdminAuthenticated(false);
+      setAuthError(err.message || 'Falha ao autenticar.');
+      await logout();
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  // 4. Logout administrativo
+  const handleAdminLogout = async () => {
+    try {
+      setIsAuthLoading(true);
+      await logout();
+      setIsAdminAuthenticated(false);
+      setAuthError(null);
+    } catch (err) {
+      console.error('Erro ao sair:', err);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  // Navegar de volta à vitrine pública
+  const handleGoToStore = () => {
+    window.location.hash = '';
+    setCurrentHash('');
+    setAuthError(null);
+  };
+
+  // 5. Carregar produtos ativos do Supabase (is_active = true explícito)
   const fetchProducts = async () => {
     try {
       setLoading(true);
@@ -894,13 +1136,13 @@ export default function App() {
       const { data, error } = await supabase
         .from('products')
         .select('*')
+        .eq('is_active', true)
         .order('code', { ascending: true });
 
       if (error) {
         console.error('Erro ao buscar do Supabase:', error);
         setErrorMessage('Não foi possível carregar os produtos no momento.');
       } else if (data) {
-        // Normaliza campos caso venham com old_price
         const formatted = data.map((item) => ({
           ...item,
           oldPrice: item.old_price || item.oldPrice
@@ -918,9 +1160,9 @@ export default function App() {
   useEffect(() => {
     fetchProducts();
 
-    // 2. Realtime Subscription: Sincronização em tempo real!
+    // Realtime Subscription com filtro explícito is_active = true
     const channel = supabase
-      .channel('public:products')
+      .channel('public:products:active')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'products' },
@@ -935,7 +1177,7 @@ export default function App() {
     };
   }, []);
 
-  // 3. Cadastrar novo produto
+  // 6. Cadastrar novo produto (código legado preservado para futura tela de admin)
   const handleCreateProduct = async (e) => {
     e.preventDefault();
     if (!newProduct.code || !newProduct.name || !newProduct.price || !newProduct.link) {
@@ -955,7 +1197,8 @@ export default function App() {
           platform: newProduct.platform,
           link: newProduct.link.trim(),
           rating: 4.9,
-          reviews: 150
+          reviews: 150,
+          is_active: false // Rascunho por padrão
         }
       ]);
 
@@ -990,6 +1233,54 @@ export default function App() {
     return matchCode || matchName;
   });
 
+  // Renderização Condicional da Rota Administrativa (#admin)
+  if (currentHash === '#admin') {
+    if (isAdminAuthenticated) {
+      return (
+        <div className="admin-temp-panel">
+          <style>{cssStyles}</style>
+          <div className="admin-temp-card">
+            <div className="admin-temp-icon">
+              <ShieldCheck size={28} strokeWidth={2.4} />
+            </div>
+            <h1 className="admin-temp-title">Acesso Administrativo Autorizado</h1>
+            <p className="admin-temp-desc">
+              Você está autenticado e confirmado como administrador da Vitrine Oficial.
+            </p>
+            <div className="admin-temp-actions">
+              <button
+                type="button"
+                className="btn-admin-temp-action btn-admin-temp-primary"
+                onClick={handleGoToStore}
+              >
+                <ShoppingBag size={18} />
+                <span>Voltar à vitrine</span>
+              </button>
+              <button
+                type="button"
+                className="btn-admin-temp-action btn-admin-temp-danger"
+                onClick={handleAdminLogout}
+                disabled={isAuthLoading}
+              >
+                <LogOut size={18} />
+                <span>{isAuthLoading ? 'Saindo...' : 'Sair da conta'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <AdminLogin
+        onSubmit={handleAdminLogin}
+        onBackToStore={handleGoToStore}
+        isLoading={isAuthLoading}
+        errorMessage={authError}
+      />
+    );
+  }
+
   return (
     <div className="vitrine-app">
       <style>{cssStyles}</style>
@@ -1006,14 +1297,6 @@ export default function App() {
             </div>
 
             <div className="header-actions">
-              <button
-                className="btn-add-product"
-                onClick={() => setIsModalOpen(true)}
-                title="Cadastrar novo produto na vitrine"
-              >
-                <PlusCircle size={15} strokeWidth={2.5} />
-                <span>+ Produto</span>
-              </button>
               <div className="verified-badge">
                 <ShieldCheck size={14} strokeWidth={2.5} />
                 <span>Verificados</span>
