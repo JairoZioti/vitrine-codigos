@@ -1,12 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShoppingBag,
   LogOut,
   ExternalLink,
   ShieldCheck,
   PackageOpen,
-  LayoutDashboard
+  LayoutDashboard,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  Tag
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const dashboardStyles = `
   .admin-dashboard-layout {
@@ -152,6 +157,11 @@ const dashboardStyles = `
 
   .admin-page-header {
     margin-bottom: 1.75rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
   }
 
   .admin-page-title-wrap {
@@ -190,6 +200,7 @@ const dashboardStyles = `
     display: flex;
     align-items: center;
     justify-content: space-between;
+    background: #ffffff;
   }
 
   .admin-content-card-title {
@@ -199,42 +210,292 @@ const dashboardStyles = `
     margin: 0;
   }
 
-  .admin-content-card-body {
-    padding: 2rem 1.5rem;
+  .admin-product-count-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 0.8rem;
+    font-weight: 700;
   }
 
-  /* Estado Vazio */
-  .admin-empty-state {
+  .admin-content-card-body {
+    padding: 0;
+  }
+
+  /* Estados: Carregamento, Vazio e Erro */
+  .admin-feedback-state {
     text-align: center;
-    padding: 3rem 1.5rem;
+    padding: 3.5rem 1.5rem;
     max-width: 440px;
     margin: 0 auto;
   }
 
-  .admin-empty-icon {
+  .admin-feedback-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 54px;
     height: 54px;
     border-radius: 16px;
-    background: #f1f5f9;
-    color: #64748b;
     margin-bottom: 1rem;
   }
 
-  .admin-empty-title {
+  .admin-icon-empty {
+    background: #f1f5f9;
+    color: #64748b;
+  }
+
+  .admin-icon-error {
+    background: #fef2f2;
+    color: #ef4444;
+  }
+
+  .admin-feedback-title {
     font-size: 1.05rem;
     font-weight: 700;
     color: #1e293b;
     margin: 0 0 0.35rem;
   }
 
-  .admin-empty-desc {
+  .admin-feedback-desc {
     font-size: 0.875rem;
     color: #64748b;
     line-height: 1.45;
-    margin: 0;
+    margin: 0 0 1.25rem;
+  }
+
+  .btn-admin-retry {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: #ea580c;
+    color: #ffffff;
+    border: none;
+    padding: 0.65rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .btn-admin-retry:hover {
+    background: #c2410c;
+  }
+
+  /* Tabela Responsiva para Desktop/Tablet */
+  .admin-table-container {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.875rem;
+  }
+
+  .admin-table th {
+    background: #f8fafc;
+    padding: 0.85rem 1.25rem;
+    font-weight: 700;
+    color: #475569;
+    border-bottom: 1px solid #e2e8f0;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  .admin-table td {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+    color: #1e293b;
+  }
+
+  .admin-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .admin-table tr:hover td {
+    background: #fafafa;
+  }
+
+  /* Badges e Células */
+  .admin-thumb-img {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    display: block;
+  }
+
+  .admin-code-badge {
+    display: inline-block;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    background: #0f172a;
+    color: #ffffff;
+    font-weight: 800;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+  }
+
+  .admin-product-name {
+    font-weight: 600;
+    color: #0f172a;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+  }
+
+  .admin-product-price {
+    font-weight: 800;
+    color: #ea580c;
+  }
+
+  .admin-platform-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.55rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .platform-shopee {
+    background: #fff1f0;
+    color: #ea580c;
+    border: 1px solid #ffccc7;
+  }
+
+  .platform-mercadolivre {
+    background: #fefce8;
+    color: #854d0e;
+    border: 1px solid #fef08a;
+  }
+
+  .platform-default {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+  }
+
+  /* Status Badges */
+  .admin-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.65rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .status-published {
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+  }
+
+  .status-draft {
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fde68a;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  .status-dot-published {
+    background: #10b981;
+  }
+
+  .status-dot-draft {
+    background: #f59e0b;
+  }
+
+  /* Apresentação Compacta em Cards para Celular */
+  .admin-mobile-list {
+    display: none;
+    padding: 1rem;
+    gap: 0.85rem;
+    flex-direction: column;
+  }
+
+  .admin-mobile-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+  }
+
+  .admin-mobile-img {
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+  }
+
+  .admin-mobile-details {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .admin-mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .admin-mobile-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.3;
+    margin: 0 0 0.4rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .admin-mobile-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  @media (max-width: 768px) {
+    .admin-table-container {
+      display: none;
+    }
+    .admin-mobile-list {
+      display: flex;
+    }
   }
 `;
 
@@ -253,6 +514,40 @@ export default function AdminDashboard({
   onLogout,
   isLoggingOut = false
 }) {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Consulta administrativa à tabela 'products'
+  // NÃO filtra por is_active = true para permitir visualização de publicados e rascunhos
+  const fetchAdminProducts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data, error: queryError } = await supabase
+        .from('products')
+        .select('id, code, name, image, price, platform, is_active, created_at')
+        .order('created_at', { ascending: false });
+
+      if (queryError) {
+        console.error('Erro ao consultar produtos (admin):', queryError);
+        setError('Não foi possível carregar a lista de produtos.');
+      } else {
+        setProducts(data || []);
+      }
+    } catch (err) {
+      console.error('Exceção ao consultar produtos (admin):', err);
+      setError('Falha na comunicação com o servidor.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminProducts();
+  }, []);
+
   return (
     <div className="admin-dashboard-layout">
       <style>{dashboardStyles}</style>
@@ -313,26 +608,184 @@ export default function AdminDashboard({
           </p>
         </div>
 
-        {/* ÁREA PREPARADA PARA RECEBER A LISTAGEM FUTURA */}
+        {/* ÁREA DE GERENCIAMENTO DE PRODUTOS */}
         <div className="admin-content-card">
           <div className="admin-content-card-header">
             <h3 className="admin-content-card-title">Produtos do Catálogo</h3>
+            {!loading && !error && (
+              <span className="admin-product-count-badge">
+                {products.length} {products.length === 1 ? 'produto' : 'produtos'}
+              </span>
+            )}
           </div>
 
           <div className="admin-content-card-body">
-            <div className="admin-empty-state">
-              <div className="admin-empty-icon">
-                <PackageOpen size={26} strokeWidth={2.2} />
+            {/* Estado 1: Carregamento */}
+            {loading && (
+              <div className="admin-feedback-state">
+                <Loader2 size={36} className="animate-spin" style={{ margin: '0 auto', animation: 'spin 1s linear infinite', color: '#ea580c' }} />
+                <p style={{ marginTop: '0.85rem', color: '#64748b', fontWeight: '600', fontSize: '0.9rem' }}>
+                  Carregando produtos do catálogo...
+                </p>
               </div>
-              <h4 className="admin-empty-title">Nenhum produto cadastrado no momento</h4>
-              <p className="admin-empty-desc">
-                A listagem e as ações de gerenciamento de produtos serão disponibilizadas nesta seção.
-              </p>
-            </div>
+            )}
+
+            {/* Estado 2: Erro com ação de tentar novamente */}
+            {!loading && error && (
+              <div className="admin-feedback-state">
+                <div className="admin-feedback-icon admin-icon-error">
+                  <AlertCircle size={26} strokeWidth={2.2} />
+                </div>
+                <h4 className="admin-feedback-title">Erro ao carregar produtos</h4>
+                <p className="admin-feedback-desc">{error}</p>
+                <button
+                  type="button"
+                  className="btn-admin-retry"
+                  onClick={fetchAdminProducts}
+                >
+                  <RefreshCw size={15} />
+                  <span>Tentar novamente</span>
+                </button>
+              </div>
+            )}
+
+            {/* Estado 3: Lista vazia */}
+            {!loading && !error && products.length === 0 && (
+              <div className="admin-feedback-state">
+                <div className="admin-feedback-icon admin-icon-empty">
+                  <PackageOpen size={26} strokeWidth={2.2} />
+                </div>
+                <h4 className="admin-feedback-title">Nenhum produto cadastrado no momento</h4>
+                <p className="admin-feedback-desc">
+                  Não foram encontrados produtos cadastrados no banco de dados.
+                </p>
+              </div>
+            )}
+
+            {/* Estado 4: Tabela preenchida (Desktop e Tablet) */}
+            {!loading && !error && products.length > 0 && (
+              <>
+                <div className="admin-table-container">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '60px' }}>Imagem</th>
+                        <th style={{ width: '90px' }}>Código</th>
+                        <th>Nome do Produto</th>
+                        <th style={{ width: '120px' }}>Preço</th>
+                        <th style={{ width: '130px' }}>Marketplace</th>
+                        <th style={{ width: '120px' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {products.map((prod) => (
+                        <tr key={prod.id || prod.code}>
+                          <td>
+                            <img
+                              src={prod.image}
+                              alt={prod.name}
+                              className="admin-thumb-img"
+                              loading="lazy"
+                            />
+                          </td>
+                          <td>
+                            <span className="admin-code-badge">CÓD: {prod.code}</span>
+                          </td>
+                          <td>
+                            <span className="admin-product-name" title={prod.name}>
+                              {prod.name}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="admin-product-price">R$ {prod.price}</span>
+                          </td>
+                          <td>
+                            <span
+                              className={`admin-platform-badge ${
+                                prod.platform === 'Shopee'
+                                  ? 'platform-shopee'
+                                  : prod.platform === 'Mercado Livre'
+                                  ? 'platform-mercadolivre'
+                                  : 'platform-default'
+                              }`}
+                            >
+                              {prod.platform}
+                            </span>
+                          </td>
+                          <td>
+                            <span
+                              className={`admin-status-badge ${
+                                prod.is_active ? 'status-published' : 'status-draft'
+                              }`}
+                            >
+                              <span
+                                className={`status-dot ${
+                                  prod.is_active ? 'status-dot-published' : 'status-dot-draft'
+                                }`}
+                              />
+                              <span>{prod.is_active ? 'Publicado' : 'Rascunho'}</span>
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Apresentação Compacta em Cards para Celular */}
+                <div className="admin-mobile-list">
+                  {products.map((prod) => (
+                    <div key={prod.id || prod.code} className="admin-mobile-card">
+                      <img
+                        src={prod.image}
+                        alt={prod.name}
+                        className="admin-mobile-img"
+                        loading="lazy"
+                      />
+                      <div className="admin-mobile-details">
+                        <div className="admin-mobile-header">
+                          <span className="admin-code-badge">CÓD: {prod.code}</span>
+                          <span
+                            className={`admin-status-badge ${
+                              prod.is_active ? 'status-published' : 'status-draft'
+                            }`}
+                          >
+                            <span
+                              className={`status-dot ${
+                                prod.is_active ? 'status-dot-published' : 'status-dot-draft'
+                              }`}
+                            />
+                            <span>{prod.is_active ? 'Publicado' : 'Rascunho'}</span>
+                          </span>
+                        </div>
+
+                        <h4 className="admin-mobile-title" title={prod.name}>
+                          {prod.name}
+                        </h4>
+
+                        <div className="admin-mobile-footer">
+                          <span className="admin-product-price">R$ {prod.price}</span>
+                          <span
+                            className={`admin-platform-badge ${
+                              prod.platform === 'Shopee'
+                                ? 'platform-shopee'
+                                : prod.platform === 'Mercado Livre'
+                                ? 'platform-mercadolivre'
+                                : 'platform-default'
+                            }`}
+                          >
+                            {prod.platform}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </main>
     </div>
   );
 }
-
