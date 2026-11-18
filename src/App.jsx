@@ -17,8 +17,9 @@ import {
   Lock
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
-import { loginWithPassword, logout, verifyAdminStatus } from './lib/auth.js';
+import { loginWithPassword, logout, verifyAdminStatus, getCurrentUser } from './lib/auth.js';
 import AdminLogin from './components/AdminLogin.jsx';
+import AdminDashboard from './components/AdminDashboard.jsx';
 
 const cssStyles = `
   /* Resets e Escopo */
@@ -867,99 +868,6 @@ const cssStyles = `
   .btn-submit-product:hover {
     background: #c2410c;
   }
-
-  /* Painel Administrativo Provisório */
-  .admin-temp-panel {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding: 2rem 1rem;
-    background-color: #f8fafc;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    color: #0f172a;
-    box-sizing: border-box;
-  }
-
-  .admin-temp-card {
-    width: 100%;
-    max-width: 480px;
-    background: #ffffff;
-    border-radius: 20px;
-    padding: 2.5rem 2rem;
-    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
-    border: 1px solid #e2e8f0;
-    text-align: center;
-    box-sizing: border-box;
-  }
-
-  .admin-temp-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 56px;
-    height: 56px;
-    border-radius: 16px;
-    background: #ecfdf5;
-    color: #059669;
-    margin-bottom: 1.25rem;
-    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.15);
-  }
-
-  .admin-temp-title {
-    font-size: 1.35rem;
-    font-weight: 800;
-    color: #0f172a;
-    margin-bottom: 0.5rem;
-  }
-
-  .admin-temp-desc {
-    font-size: 0.9rem;
-    color: #64748b;
-    line-height: 1.5;
-    margin-bottom: 2rem;
-  }
-
-  .admin-temp-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .btn-admin-temp-action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.85rem 1.25rem;
-    border-radius: 12px;
-    font-size: 0.95rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: none;
-    text-decoration: none;
-  }
-
-  .btn-admin-temp-primary {
-    background: #0f172a;
-    color: #ffffff;
-  }
-
-  .btn-admin-temp-primary:hover {
-    background: #1e293b;
-  }
-
-  .btn-admin-temp-danger {
-    background: #fef2f2;
-    color: #dc2626;
-    border: 1.5px solid #fecaca;
-  }
-
-  .btn-admin-temp-danger:hover {
-    background: #fee2e2;
-  }
 `;
 
 export default function App() {
@@ -968,6 +876,7 @@ export default function App() {
 
   // Estados de Autenticação e Autorização Administrativa
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [adminEmail, setAdminEmail] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
 
@@ -1021,12 +930,17 @@ export default function App() {
       if (isAdmin === true) {
         setIsAdminAuthenticated(true);
         setAuthError(null);
+        // Obtém identificação discreta do usuário para o cabeçalho
+        const { user } = await getCurrentUser();
+        setAdminEmail(user?.email || null);
       } else {
         // Usuário sem privilégios ou não logado
         setIsAdminAuthenticated(false);
+        setAdminEmail(null);
       }
     } catch (err) {
       setIsAdminAuthenticated(false);
+      setAdminEmail(null);
       setAuthError(err.message || 'Erro inesperado ao verificar autorização.');
     } finally {
       setIsAuthLoading(false);
@@ -1045,6 +959,7 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') {
         setIsAdminAuthenticated(false);
+        setAdminEmail(null);
         setAuthError(null);
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         // Agenda a checagem fora do callback síncrono
@@ -1090,15 +1005,18 @@ export default function App() {
 
       if (isAdmin === true) {
         setIsAdminAuthenticated(true);
+        setAdminEmail(user?.email || null);
         setAuthError(null);
       } else {
         // Autenticado, porém sem permissão na tabela app_admins
         setIsAdminAuthenticated(false);
+        setAdminEmail(null);
         setAuthError('Acesso não autorizado. Esta conta não possui privilégios de administrador.');
         await logout();
       }
     } catch (err) {
       setIsAdminAuthenticated(false);
+      setAdminEmail(null);
       setAuthError(err.message || 'Falha ao autenticar.');
       await logout();
     } finally {
@@ -1112,6 +1030,7 @@ export default function App() {
       setIsAuthLoading(true);
       await logout();
       setIsAdminAuthenticated(false);
+      setAdminEmail(null);
       setAuthError(null);
     } catch (err) {
       console.error('Erro ao sair:', err);
@@ -1237,37 +1156,12 @@ export default function App() {
   if (currentHash === '#admin') {
     if (isAdminAuthenticated) {
       return (
-        <div className="admin-temp-panel">
-          <style>{cssStyles}</style>
-          <div className="admin-temp-card">
-            <div className="admin-temp-icon">
-              <ShieldCheck size={28} strokeWidth={2.4} />
-            </div>
-            <h1 className="admin-temp-title">Acesso Administrativo Autorizado</h1>
-            <p className="admin-temp-desc">
-              Você está autenticado e confirmado como administrador da Vitrine Oficial.
-            </p>
-            <div className="admin-temp-actions">
-              <button
-                type="button"
-                className="btn-admin-temp-action btn-admin-temp-primary"
-                onClick={handleGoToStore}
-              >
-                <ShoppingBag size={18} />
-                <span>Voltar à vitrine</span>
-              </button>
-              <button
-                type="button"
-                className="btn-admin-temp-action btn-admin-temp-danger"
-                onClick={handleAdminLogout}
-                disabled={isAuthLoading}
-              >
-                <LogOut size={18} />
-                <span>{isAuthLoading ? 'Saindo...' : 'Sair da conta'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <AdminDashboard
+          adminEmail={adminEmail}
+          onGoToStore={handleGoToStore}
+          onLogout={handleAdminLogout}
+          isLoggingOut={isAuthLoading}
+        />
       );
     }
 
