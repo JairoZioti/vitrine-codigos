@@ -11,6 +11,8 @@ import {
   RefreshCw,
   PlusCircle,
   Pencil,
+  Eye,
+  EyeOff,
   Tag
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -25,9 +27,14 @@ const dashboardStyles = `
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
+    /* Impede que qualquer filho quebre para fora da viewport */
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 
-  /* Header Superior do Painel */
+  /* ============================================================
+     CABEÇALHO — responsivo em até 2 linhas em celulares
+     ============================================================ */
   .admin-header {
     background: #ffffff;
     border-bottom: 1px solid #e2e8f0;
@@ -40,22 +47,24 @@ const dashboardStyles = `
   .admin-header-inner {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 0.85rem 1.25rem;
+    padding: 0.75rem 1rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;         /* quebra para 2 linhas se necessário */
   }
 
   .admin-brand-wrap {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    flex-shrink: 0;
   }
 
   .admin-brand-icon {
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
     border-radius: 10px;
     background: #0f172a;
     color: #ffffff;
@@ -71,7 +80,7 @@ const dashboardStyles = `
   }
 
   .admin-brand-title {
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 800;
     color: #0f172a;
     line-height: 1.2;
@@ -79,16 +88,19 @@ const dashboardStyles = `
   }
 
   .admin-brand-badge {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 600;
     color: #ea580c;
     letter-spacing: 0.02em;
   }
 
+  /* Ações do cabeçalho: quebram em duas linhas em mobile */
   .admin-header-actions {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;         /* permite quebrar para nova linha */
+    justify-content: flex-end;
   }
 
   .btn-admin-primary {
@@ -107,16 +119,21 @@ const dashboardStyles = `
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.4rem 0.75rem;
+    padding: 0.35rem 0.65rem;
     background: #f1f5f9;
     border: 1px solid #e2e8f0;
     border-radius: 9999px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 600;
     color: #475569;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  @media (max-width: 640px) {
+  /* Oculta o e-mail em telas muito estreitas (mantém botões visíveis) */
+  @media (max-width: 480px) {
     .admin-user-pill {
       display: none;
     }
@@ -125,16 +142,29 @@ const dashboardStyles = `
   .btn-admin-header {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
-    padding: 0.5rem 0.85rem;
-    border-radius: 10px;
-    font-size: 0.85rem;
+    gap: 0.4rem;
+    padding: 0.45rem 0.75rem;
+    border-radius: 9px;
+    font-size: 0.82rem;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.15s ease;
     border: 1px solid transparent;
     text-decoration: none;
     box-sizing: border-box;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Em celulares muito estreitos, ocultar o texto dos botões "Ver vitrine" e "Sair",
+     mantendo apenas o ícone (ainda totalmente clicável) */
+  @media (max-width: 400px) {
+    .btn-admin-header span {
+      display: none;
+    }
+    .btn-admin-header {
+      padding: 0.45rem 0.6rem;
+    }
   }
 
   .btn-admin-outline {
@@ -160,18 +190,20 @@ const dashboardStyles = `
     color: #b91c1c;
   }
 
-  /* Conteúdo Principal */
+  /* ============================================================
+     CONTEÚDO PRINCIPAL
+     ============================================================ */
   .admin-main-container {
     flex: 1;
     max-width: 1200px;
     width: 100%;
     margin: 0 auto;
-    padding: 2rem 1.25rem 4rem;
+    padding: 1.5rem 1rem 4rem;
     box-sizing: border-box;
   }
 
   .admin-page-header {
-    margin-bottom: 1.75rem;
+    margin-bottom: 1.5rem;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -187,7 +219,7 @@ const dashboardStyles = `
   }
 
   .admin-page-title {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     font-weight: 800;
     color: #0f172a;
     letter-spacing: -0.02em;
@@ -195,12 +227,14 @@ const dashboardStyles = `
   }
 
   .admin-page-subtitle {
-    font-size: 0.9rem;
+    font-size: 0.875rem;
     color: #64748b;
     margin: 0;
   }
 
-  /* Card da Área de Gerenciamento */
+  /* ============================================================
+     CARD DE GERENCIAMENTO
+     ============================================================ */
   .admin-content-card {
     background: #ffffff;
     border: 1px solid #e2e8f0;
@@ -210,12 +244,14 @@ const dashboardStyles = `
   }
 
   .admin-content-card-header {
-    padding: 1.25rem 1.5rem;
+    padding: 1rem 1.25rem;
     border-bottom: 1px solid #f1f5f9;
     display: flex;
     align-items: center;
     justify-content: space-between;
     background: #ffffff;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   .admin-content-card-title {
@@ -240,10 +276,12 @@ const dashboardStyles = `
     padding: 0;
   }
 
-  /* Estados: Carregamento, Vazio e Erro */
+  /* ============================================================
+     ESTADOS DE FEEDBACK
+     ============================================================ */
   .admin-feedback-state {
     text-align: center;
-    padding: 3.5rem 1.5rem;
+    padding: 3rem 1.25rem;
     max-width: 440px;
     margin: 0 auto;
   }
@@ -301,33 +339,39 @@ const dashboardStyles = `
     background: #c2410c;
   }
 
-  /* Tabela Responsiva para Desktop/Tablet */
+  /* ============================================================
+     TABELA — desktop com espaço confortável (> 1100px)
+     Em larguras de até 1100px (incluindo Surface Pro 960px e iPad Pro 1032px),
+     ativa a apresentação em cartões responsivos, evitando scroll horizontal e botões cortados.
+     ============================================================ */
   .admin-table-container {
     width: 100%;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .admin-table {
     width: 100%;
     border-collapse: collapse;
     text-align: left;
-    font-size: 0.875rem;
+    font-size: 0.84rem;
+    table-layout: auto;
   }
 
   .admin-table th {
     background: #f8fafc;
-    padding: 0.85rem 1.25rem;
+    padding: 0.75rem 0.85rem;
     font-weight: 700;
     color: #475569;
     border-bottom: 1px solid #e2e8f0;
     text-transform: uppercase;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     letter-spacing: 0.04em;
     white-space: nowrap;
   }
 
   .admin-table td {
-    padding: 1rem 1.25rem;
+    padding: 0.85rem 0.85rem;
     border-bottom: 1px solid #f1f5f9;
     vertical-align: middle;
     color: #1e293b;
@@ -341,32 +385,36 @@ const dashboardStyles = `
     background: #fafafa;
   }
 
-  /* Badges e Células */
+  /* ============================================================
+     BADGES E CÉLULAS DA TABELA
+     ============================================================ */
   .admin-thumb-img {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border-radius: 8px;
     object-fit: cover;
     background: #f1f5f9;
     border: 1px solid #e2e8f0;
     display: block;
+    flex-shrink: 0;
   }
 
   .admin-code-badge {
     display: inline-block;
-    padding: 0.2rem 0.55rem;
+    padding: 0.2rem 0.5rem;
     border-radius: 6px;
     background: #0f172a;
     color: #ffffff;
     font-weight: 800;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     letter-spacing: 0.05em;
+    white-space: nowrap;
   }
 
   .admin-product-name {
     font-weight: 600;
     color: #0f172a;
-    max-width: 320px;
+    max-width: 240px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -376,15 +424,17 @@ const dashboardStyles = `
   .admin-product-price {
     font-weight: 800;
     color: #ea580c;
+    white-space: nowrap;
   }
 
   .admin-platform-badge {
     display: inline-flex;
     align-items: center;
-    padding: 0.25rem 0.55rem;
+    padding: 0.22rem 0.5rem;
     border-radius: 6px;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 700;
+    white-space: nowrap;
   }
 
   .platform-shopee {
@@ -405,14 +455,16 @@ const dashboardStyles = `
     border: 1px solid #e2e8f0;
   }
 
-  /* Status Badges */
+  /* ============================================================
+     STATUS BADGES
+     ============================================================ */
   .admin-status-badge {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    padding: 0.3rem 0.65rem;
+    padding: 0.28rem 0.6rem;
     border-radius: 9999px;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 700;
     white-space: nowrap;
   }
@@ -433,6 +485,7 @@ const dashboardStyles = `
     width: 6px;
     height: 6px;
     border-radius: 50%;
+    flex-shrink: 0;
   }
 
   .status-dot-published {
@@ -443,21 +496,25 @@ const dashboardStyles = `
     background: #f59e0b;
   }
 
-  /* Botão de Ação na Listagem (Editar) */
+  /* ============================================================
+     BOTÕES DE AÇÃO NAS LINHAS / CARDS
+     ============================================================ */
   .btn-admin-action {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.35rem;
-    padding: 0.4rem 0.65rem;
+    gap: 0.3rem;
+    padding: 0.38rem 0.6rem;
     border-radius: 8px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
     background: #ffffff;
     color: #475569;
     border: 1px solid #cbd5e1;
     transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .btn-admin-action:hover {
@@ -471,11 +528,102 @@ const dashboardStyles = `
     transform: scale(0.98);
   }
 
-  /* Apresentação Compacta em Cards para Celular */
+  .btn-admin-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Botão Publicar */
+  .btn-publish {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 0.38rem 0.6rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .btn-publish:hover {
+    background: #d1fae5;
+    border-color: #6ee7b7;
+  }
+
+  .btn-publish:active {
+    background: #a7f3d0;
+    transform: scale(0.98);
+  }
+
+  .btn-publish:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Botão Retirar da Vitrine */
+  .btn-withdraw {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 0.38rem 0.6rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #fed7aa;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .btn-withdraw:hover {
+    background: #ffedd5;
+    border-color: #fdba74;
+  }
+
+  .btn-withdraw:active {
+    background: #fed7aa;
+    transform: scale(0.98);
+  }
+
+  .btn-withdraw:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Grupo de botões de ação — pode quebrar linha nos cards mobile */
+  .admin-action-group {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;           /* <<< corrigido: era nowrap, bloqueava mobile */
+  }
+
+  /* Na tabela desktop, forçar os botões na mesma linha */
+  .admin-table .admin-action-group {
+    flex-wrap: nowrap;
+  }
+
+  /* ============================================================
+     CARDS MOBILE — estrutura vertical com botões acessíveis
+     ============================================================ */
   .admin-mobile-list {
     display: none;
-    padding: 1rem;
-    gap: 0.85rem;
+    padding: 0.85rem;
+    gap: 0.75rem;
     flex-direction: column;
   }
 
@@ -483,15 +631,17 @@ const dashboardStyles = `
     background: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    padding: 1rem;
+    padding: 0.9rem;
     display: flex;
-    gap: 0.85rem;
+    gap: 0.75rem;
     align-items: flex-start;
+    /* min-width: 0 no container evita overflow do filho flex */
+    min-width: 0;
   }
 
   .admin-mobile-img {
-    width: 64px;
-    height: 64px;
+    width: 58px;
+    height: 58px;
     border-radius: 8px;
     object-fit: cover;
     flex-shrink: 0;
@@ -501,7 +651,10 @@ const dashboardStyles = `
 
   .admin-mobile-details {
     flex: 1;
-    min-width: 0;
+    min-width: 0;              /* essencial para evitar overflow de texto */
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
   }
 
   .admin-mobile-header {
@@ -509,36 +662,234 @@ const dashboardStyles = `
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    margin-bottom: 0.35rem;
+    flex-wrap: wrap;
   }
 
   .admin-mobile-title {
-    font-size: 0.9rem;
+    font-size: 0.875rem;
     font-weight: 700;
     color: #0f172a;
     line-height: 1.3;
-    margin: 0 0 0.4rem;
+    margin: 0;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
 
+  .admin-mobile-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  /* Rodapé dos cards: botões em linha própria, sempre acessíveis */
   .admin-mobile-footer {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    gap: 0.4rem;
+    margin-top: 0.3rem;
+    flex-wrap: wrap;           /* <<< corrigido: quebra quando não cabe */
   }
 
-  @media (max-width: 768px) {
+  /* ============================================================
+     BREAKPOINTS
+     Tabela visível apenas acima de 1100px (desktop com largura confortável).
+     Cards responsivos visíveis em 1100px ou menos (cobre celulares de 360-440px,
+     iPad Mini de 768px, Surface Pro 10 de 960px e iPad Pro 13 de 1032px).
+     ============================================================ */
+  @media (max-width: 1100px) {
     .admin-table-container {
       display: none;
     }
     .admin-mobile-list {
       display: flex;
     }
+  }
+
+  /* ============================================================
+     DIÁLOGO DE CONFIRMAÇÃO
+     ============================================================ */
+  .admin-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(3px);
+    z-index: 200;
+    display: flex;
+    align-items: flex-start;    /* <<< flex-start + padding = scroll seguro */
+    justify-content: center;
+    padding: 1.25rem 1rem;
+    box-sizing: border-box;
+    overflow-y: auto;           /* scroll vertical se diálogo for alto */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-confirm-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 1.5rem;
+    max-width: 400px;
+    width: 100%;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15), 0 10px 10px -5px rgba(0,0,0,0.04);
+    border: 1px solid #e2e8f0;
+    margin: auto;               /* centraliza verticalmente quando há espaço */
+  }
+
+  .admin-confirm-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+  }
+
+  .admin-confirm-icon-publish {
+    background: #ecfdf5;
+    color: #047857;
+  }
+
+  .admin-confirm-icon-withdraw {
+    background: #fff7ed;
+    color: #c2410c;
+  }
+
+  .admin-confirm-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 0.5rem;
+    line-height: 1.3;
+  }
+
+  .admin-confirm-desc {
+    font-size: 0.875rem;
+    color: #475569;
+    margin: 0 0 0.35rem;
+    line-height: 1.5;
+  }
+
+  .admin-confirm-product-name {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #0f172a;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    margin: 0.65rem 0 1.1rem;
+    display: block;
+    overflow-wrap: break-word;  /* <<< quebra nomes longos em vez de transbordar */
+    word-break: break-word;
+  }
+
+  .admin-confirm-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    padding: 0.65rem 0.85rem;
+    margin-bottom: 1rem;
+    font-size: 0.84rem;
+    color: #991b1b;
+    line-height: 1.4;
+  }
+
+  /* Botões do diálogo: ocupam a largura total em telas muito estreitas */
+  .admin-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 360px) {
+    .admin-confirm-actions {
+      flex-direction: column-reverse;
+    }
+    .admin-confirm-actions button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  .btn-confirm-cancel {
+    padding: 0.55rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: #ffffff;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    transition: all 0.2s ease;
+  }
+
+  .btn-confirm-cancel:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+  }
+
+  .btn-confirm-cancel:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-confirm-publish {
+    padding: 0.55rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: #047857;
+    color: #ffffff;
+    border: 1px solid #047857;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    transition: all 0.2s ease;
+  }
+
+  .btn-confirm-publish:hover {
+    background: #065f46;
+    border-color: #065f46;
+  }
+
+  .btn-confirm-publish:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .btn-confirm-withdraw {
+    padding: 0.55rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: #c2410c;
+    color: #ffffff;
+    border: 1px solid #c2410c;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    transition: all 0.2s ease;
+  }
+
+  .btn-confirm-withdraw:hover {
+    background: #9a3412;
+    border-color: #9a3412;
+  }
+
+  .btn-confirm-withdraw:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 `;
 
@@ -562,6 +913,12 @@ export default function AdminDashboard({
   const [error, setError] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  // confirmAction: { product, targetStatus } | null
+  const [confirmAction, setConfirmAction] = useState(null);
+  // togglingId: id do produto cuja operação de status está em andamento
+  const [togglingId, setTogglingId] = useState(null);
+  // toggleError: mensagem de erro exibida dentro do diálogo de confirmação
+  const [toggleError, setToggleError] = useState(null);
 
   // Consulta administrativa à tabela 'products'
   // NÃO filtra por is_active = true para permitir visualização de publicados e rascunhos
@@ -608,6 +965,69 @@ export default function AdminDashboard({
   const handleOpenEdit = (product) => {
     setEditingProduct(product);
     setIsFormOpen(true);
+  };
+
+  /**
+   * Abre o diálogo de confirmação antes de alterar o status.
+   * targetStatus: true = publicar | false = retirar da vitrine
+   */
+  const handleRequestToggle = (product, targetStatus) => {
+    setToggleError(null);
+    setConfirmAction({ product, targetStatus });
+  };
+
+  /** Cancela o diálogo de confirmação sem fazer nada */
+  const handleCancelToggle = () => {
+    if (togglingId) return; // Bloqueia cancelamento enquanto operação está em andamento
+    setConfirmAction(null);
+    setToggleError(null);
+  };
+
+  /**
+   * Executa a alteração de status após confirmação explícita do administrador.
+   * Altera SOMENTE o campo is_active do produto identificado pelo id.
+   * Não altera nenhum outro campo. Não assume sucesso antes da resposta do servidor.
+   */
+  const handleConfirmToggle = async () => {
+    if (!confirmAction) return;
+    const { product, targetStatus } = confirmAction;
+
+    setTogglingId(product.id);
+    setToggleError(null);
+
+    try {
+      const { data: updatedRow, error: toggleErr } = await supabase
+        .from('products')
+        .update({ is_active: targetStatus })
+        .eq('id', product.id)
+        .select('id, is_active')
+        .single();
+
+      if (toggleErr) {
+        // PGRST116: nenhuma linha correspondeu ao filtro — produto não encontrado
+        if (toggleErr.code === 'PGRST116') {
+          setToggleError('Produto não encontrado. Pode ter sido removido. Recarregue a listagem.');
+        } else {
+          setToggleError(toggleErr.message || 'Erro ao atualizar o status do produto.');
+        }
+        return;
+      }
+
+      // Verificação positiva: status retornado deve corresponder exatamente ao solicitado
+      if (!updatedRow?.id || updatedRow.is_active !== targetStatus) {
+        setToggleError('A alteração de status não pôde ser confirmada pelo servidor. Recarregue a listagem.');
+        return;
+      }
+
+      // Sucesso confirmado — fecha o diálogo e atualiza a listagem do servidor
+      setConfirmAction(null);
+      setToggleError(null);
+      await fetchAdminProducts();
+    } catch (err) {
+      setToggleError(err.message || 'Falha inesperada ao comunicar com o servidor.');
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   return (
@@ -747,7 +1167,7 @@ export default function AdminDashboard({
                         <th style={{ width: '120px' }}>Preço</th>
                         <th style={{ width: '130px' }}>Marketplace</th>
                         <th style={{ width: '120px' }}>Status</th>
-                        <th style={{ width: '85px', textAlign: 'center' }}>Ações</th>
+                        <th style={{ width: '160px', textAlign: 'center' }}>Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -800,15 +1220,49 @@ export default function AdminDashboard({
                             </span>
                           </td>
                           <td style={{ textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              className="btn-admin-action"
-                              onClick={() => handleOpenEdit(prod)}
-                              title={`Editar produto CÓD: ${prod.code}`}
-                            >
-                              <Pencil size={13} strokeWidth={2.2} />
-                              <span>Editar</span>
-                            </button>
+                            <div className="admin-action-group">
+                              <button
+                                type="button"
+                                className="btn-admin-action"
+                                onClick={() => handleOpenEdit(prod)}
+                                disabled={togglingId === prod.id}
+                                title={`Editar produto CÓD: ${prod.code}`}
+                              >
+                                <Pencil size={13} strokeWidth={2.2} />
+                                <span>Editar</span>
+                              </button>
+                              {prod.is_active ? (
+                                <button
+                                  type="button"
+                                  className="btn-withdraw"
+                                  onClick={() => handleRequestToggle(prod, false)}
+                                  disabled={togglingId === prod.id}
+                                  title={`Retirar da vitrine: ${prod.name}`}
+                                >
+                                  {togglingId === prod.id ? (
+                                    <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                                  ) : (
+                                    <EyeOff size={13} strokeWidth={2.2} />
+                                  )}
+                                  <span>Retirar</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn-publish"
+                                  onClick={() => handleRequestToggle(prod, true)}
+                                  disabled={togglingId === prod.id}
+                                  title={`Publicar na vitrine: ${prod.name}`}
+                                >
+                                  {togglingId === prod.id ? (
+                                    <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                                  ) : (
+                                    <Eye size={13} strokeWidth={2.2} />
+                                  )}
+                                  <span>Publicar</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -860,15 +1314,49 @@ export default function AdminDashboard({
                           >
                             {prod.platform}
                           </span>
-                          <button
-                            type="button"
-                            className="btn-admin-action"
-                            onClick={() => handleOpenEdit(prod)}
-                            title={`Editar produto CÓD: ${prod.code}`}
-                          >
-                            <Pencil size={13} strokeWidth={2.2} />
-                            <span>Editar</span>
-                          </button>
+                          <div className="admin-action-group">
+                            <button
+                              type="button"
+                              className="btn-admin-action"
+                              onClick={() => handleOpenEdit(prod)}
+                              disabled={togglingId === prod.id}
+                              title={`Editar produto CÓD: ${prod.code}`}
+                            >
+                              <Pencil size={13} strokeWidth={2.2} />
+                              <span>Editar</span>
+                            </button>
+                            {prod.is_active ? (
+                              <button
+                                type="button"
+                                className="btn-withdraw"
+                                onClick={() => handleRequestToggle(prod, false)}
+                                disabled={togglingId === prod.id}
+                                title={`Retirar da vitrine: ${prod.name}`}
+                              >
+                                {togglingId === prod.id ? (
+                                  <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                                ) : (
+                                  <EyeOff size={13} strokeWidth={2.2} />
+                                )}
+                                <span>Retirar</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn-publish"
+                                onClick={() => handleRequestToggle(prod, true)}
+                                disabled={togglingId === prod.id}
+                                title={`Publicar na vitrine: ${prod.name}`}
+                              >
+                                {togglingId === prod.id ? (
+                                  <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                                ) : (
+                                  <Eye size={13} strokeWidth={2.2} />
+                                )}
+                                <span>Publicar</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -890,6 +1378,89 @@ export default function AdminDashboard({
         }}
         onProductSaved={handleProductSaved}
       />
+
+      {/* DIÁLOGO DE CONFIRMAÇÃO DE PUBLICAÇÃO / RETIRADA */}
+      {confirmAction && (
+        <div
+          className="admin-confirm-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-dialog-title"
+          aria-describedby="confirm-dialog-desc"
+        >
+          <div className="admin-confirm-card">
+            <div
+              className={`admin-confirm-icon ${
+                confirmAction.targetStatus ? 'admin-confirm-icon-publish' : 'admin-confirm-icon-withdraw'
+              }`}
+            >
+              {confirmAction.targetStatus
+                ? <Eye size={22} strokeWidth={2.2} />
+                : <EyeOff size={22} strokeWidth={2.2} />
+              }
+            </div>
+
+            <h3 id="confirm-dialog-title" className="admin-confirm-title">
+              {confirmAction.targetStatus
+                ? 'Publicar produto na vitrine?'
+                : 'Retirar produto da vitrine?'
+              }
+            </h3>
+
+            <p id="confirm-dialog-desc" className="admin-confirm-desc">
+              {confirmAction.targetStatus
+                ? 'O produto ficará visível para todos os visitantes da vitrine pública.'
+                : 'O produto será ocultado da vitrine pública. Ele permanece salvo no banco de dados e pode ser republicado a qualquer momento.'
+              }
+            </p>
+
+            <span className="admin-confirm-product-name">
+              CÓD: {confirmAction.product.code} — {confirmAction.product.name}
+            </span>
+
+            {toggleError && (
+              <div className="admin-confirm-error" role="alert">
+                <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
+                <span>{toggleError}</span>
+              </div>
+            )}
+
+            <div className="admin-confirm-actions">
+              <button
+                type="button"
+                className="btn-confirm-cancel"
+                onClick={handleCancelToggle}
+                disabled={!!togglingId}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={confirmAction.targetStatus ? 'btn-confirm-publish' : 'btn-confirm-withdraw'}
+                onClick={handleConfirmToggle}
+                disabled={!!togglingId}
+              >
+                {togglingId ? (
+                  <>
+                    <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                    <span>Aguarde...</span>
+                  </>
+                ) : confirmAction.targetStatus ? (
+                  <>
+                    <Eye size={15} />
+                    <span>Sim, publicar</span>
+                  </>
+                ) : (
+                  <>
+                    <EyeOff size={15} />
+                    <span>Sim, retirar</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
