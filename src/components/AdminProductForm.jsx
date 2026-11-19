@@ -11,6 +11,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { SUPPORTED_MARKETPLACES, detectMarketplaceFromUrl } from '../lib/marketplace';
 import { generateProductCode, isProductCodeUniqueViolation } from '../lib/productCode';
+import { SUPPORTED_CATEGORIES } from '../lib/categories';
 
 const MAX_CODE_ATTEMPTS = 5;
 
@@ -391,6 +392,7 @@ export default function AdminProductForm({
   const [formData, setFormData] = useState({
     code: '',
     name: '',
+    category: '',
     price: '',
     old_price: '',
     platform: '',
@@ -436,6 +438,7 @@ export default function AdminProductForm({
       setFormData({
         code: initialProduct.code || '',
         name: initialProduct.name || '',
+        category: typeof initialProduct.category === 'string' ? initialProduct.category.trim() : '',
         price: initialProduct.price || '',
         old_price: initialProduct.old_price || initialProduct.oldPrice || '',
         platform: initialProduct.platform || '',
@@ -447,6 +450,7 @@ export default function AdminProductForm({
       setFormData({
         code: generateProductCode(),
         name: '',
+        category: '',
         price: '',
         old_price: '',
         platform: '',
@@ -565,6 +569,12 @@ export default function AdminProductForm({
       return;
     }
 
+    const trimmedCategory = formData.category ? formData.category.trim() : '';
+    if (!isEditing && !trimmedCategory) {
+      setErrorMessage('Selecione uma categoria para o produto.');
+      return;
+    }
+
     // Validação e padronização monetária do preço atual
     const priceValidation = formatAndValidatePrice(formData.price);
     if (!priceValidation.valid) {
@@ -601,6 +611,11 @@ export default function AdminProductForm({
       if (isEditing) {
         // MODO EDIÇÃO: Atualiza exclusivamente os campos editáveis filtrando por id
         // Regra estrita: NÃO altera code, is_active, id, created_at, rating ou reviews
+        // Inclui category somente quando houve mudança em relação ao valor salvo,
+        // preservando category: null em produtos legados e valores desconhecidos preexistentes.
+        const initialCategory =
+          typeof initialProduct.category === 'string' ? initialProduct.category.trim() : '';
+
         const updatePayload = {
           name: trimmedName,
           price: validatedPrice,
@@ -609,6 +624,10 @@ export default function AdminProductForm({
           image: trimmedImage,
           link: trimmedLink
         };
+
+        if (trimmedCategory !== initialCategory) {
+          updatePayload.category = trimmedCategory || null;
+        }
 
         const { data: updatedRow, error: updateError } = await supabase
           .from('products')
@@ -652,6 +671,7 @@ export default function AdminProductForm({
           const insertPayload = {
             code: currentCode,
             name: trimmedName,
+            category: trimmedCategory,
             price: validatedPrice,
             old_price: validatedOldPrice,
             platform: trimmedPlatform,
@@ -894,6 +914,36 @@ export default function AdminProductForm({
               onChange={handleChange}
               disabled={saving}
             />
+          </div>
+
+          <div className="admin-form-group">
+            <label className="admin-form-label" htmlFor="product-category">
+              Categoria do produto {!isEditing && <span className="required-star">*</span>}
+            </label>
+            <select
+              id="product-category"
+              name="category"
+              required={!isEditing}
+              className="admin-form-select"
+              value={formData.category}
+              onChange={handleChange}
+              disabled={saving}
+            >
+              <option value="">Selecione uma categoria</option>
+              {SUPPORTED_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+              {formData.category && !SUPPORTED_CATEGORIES.includes(formData.category) && (
+                <option value={formData.category}>{formData.category}</option>
+              )}
+            </select>
+            {isEditing && !formData.category && (
+              <p className="admin-form-note">
+                Produto ainda sem categoria. Você pode classificá-lo agora ou manter como está.
+              </p>
+            )}
           </div>
 
           <div className="admin-form-grid-2">

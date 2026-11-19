@@ -422,6 +422,22 @@ const dashboardStyles = `
     display: block;
   }
 
+  .admin-category-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.2rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #475569;
+  }
+
+  .admin-category-unclassified {
+    color: #94a3b8;
+    font-weight: 500;
+    font-style: italic;
+  }
+
   .admin-product-price {
     font-weight: 800;
     color: #ea580c;
@@ -937,7 +953,7 @@ export default function AdminDashboard({
 
       const { data, error: queryError } = await supabase
         .from('products')
-        .select('id, code, name, image, price, old_price, platform, link, is_active, created_at')
+        .select('id, code, name, category, image, price, old_price, platform, link, is_active, created_at')
         .order('created_at', { ascending: false });
 
       if (queryError) {
@@ -1195,6 +1211,17 @@ export default function AdminDashboard({
                             <span className="admin-product-name" title={prod.name}>
                               {prod.name}
                             </span>
+                            {prod.category && prod.category.trim() ? (
+                              <span className="admin-category-label">
+                                <Tag size={11} strokeWidth={2.2} />
+                                <span>{prod.category.trim()}</span>
+                              </span>
+                            ) : (
+                              <span className="admin-category-label admin-category-unclassified">
+                                <Tag size={11} strokeWidth={2} />
+                                <span>Sem categoria</span>
+                              </span>
+                            )}
                           </td>
                           <td>
                             <span className="admin-product-price">R$ {prod.price}</span>
@@ -1301,6 +1328,20 @@ export default function AdminDashboard({
                         <h4 className="admin-mobile-title" title={prod.name}>
                           {prod.name}
                         </h4>
+
+                        <div className="admin-mobile-meta">
+                          {prod.category && prod.category.trim() ? (
+                            <span className="admin-category-label">
+                              <Tag size={11} strokeWidth={2.2} />
+                              <span>{prod.category.trim()}</span>
+                            </span>
+                          ) : (
+                            <span className="admin-category-label admin-category-unclassified">
+                              <Tag size={11} strokeWidth={2} />
+                              <span>Sem categoria</span>
+                            </span>
+                          )}
+                        </div>
 
                         <div className="admin-mobile-footer">
                           <span className="admin-product-price">R$ {prod.price}</span>
