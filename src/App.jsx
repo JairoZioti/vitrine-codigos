@@ -14,11 +14,18 @@ import {
   RefreshCw,
   PackageOpen,
   LogOut,
-  Lock
+  Lock,
+  Tag
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { loginWithPassword, logout, verifyAdminStatus, getCurrentUser } from './lib/auth.js';
 import { getMarketplaceClass } from './lib/marketplace.js';
+import {
+  ALL_CATEGORIES_FILTER,
+  DEFAULT_CATEGORY,
+  SUPPORTED_CATEGORIES,
+  normalizeCategory
+} from './lib/categories.js';
 import AdminLogin from './components/AdminLogin.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 
@@ -194,12 +201,115 @@ const cssStyles = `
     padding: 1.25rem 1rem 3rem;
   }
 
+  /* Barra de Categorias Responsiva */
+  .category-nav {
+    margin-bottom: 1rem;
+    max-width: 100%;
+  }
+
+  .category-list {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.15rem 0.1rem 0.4rem;
+    scrollbar-width: none;
+  }
+
+  .category-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  @media (min-width: 768px) {
+    .category-list {
+      flex-wrap: wrap;
+      overflow-x: visible;
+      padding-bottom: 0.15rem;
+    }
+  }
+
+  .category-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 0.45rem 0.95rem;
+    border-radius: 9999px;
+    border: 1.5px solid #cbd5e1;
+    background: #ffffff;
+    color: #334155;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .category-chip:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+    color: #0f172a;
+  }
+
+  .category-chip.active {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+  }
+
+  .category-chip:focus-visible {
+    outline: 2px solid #ea580c;
+    outline-offset: 2px;
+  }
+
   .filter-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
     margin-bottom: 1rem;
     padding: 0 0.25rem;
+  }
+
+  .empty-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+  }
+
+  .btn-reset-secondary {
+    background: #ffffff;
+    color: #334155;
+    border: 1.5px solid #cbd5e1;
+    padding: 0.75rem 1.35rem;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-reset-secondary:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+    color: #0f172a;
+  }
+
+  .details-category-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 0.45rem;
   }
 
   .filter-summary {
@@ -903,6 +1013,7 @@ export default function App() {
 
   // Estados da Vitrine Pública
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORIES_FILTER);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productsList, setProductsList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1164,9 +1275,35 @@ export default function App() {
     }
   };
 
+  // Categorias presentes entre os produtos publicados (is_active = true),
+  // respeitando a ordem de SUPPORTED_CATEGORIES com "Outros" sempre por último.
+  const presentCategories = new Set(
+    productsList.map((item) => normalizeCategory(item.category))
+  );
+
+  const orderedSupportedWithoutDefault = SUPPORTED_CATEGORIES.filter(
+    (cat) => cat !== DEFAULT_CATEGORY && presentCategories.has(cat)
+  );
+
+  const extraCustomCategories = [...presentCategories]
+    .filter((cat) => !SUPPORTED_CATEGORIES.includes(cat))
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+  const availableCategories = [
+    ALL_CATEGORIES_FILTER,
+    ...orderedSupportedWithoutDefault,
+    ...extraCustomCategories,
+    ...(presentCategories.has(DEFAULT_CATEGORY) ? [DEFAULT_CATEGORY] : [])
+  ];
+
   const cleanSearch = searchTerm.trim().toLowerCase();
+  const hasCategoryFilter = selectedCategory !== ALL_CATEGORIES_FILTER;
+  const hasActiveFilters = Boolean(cleanSearch) || hasCategoryFilter;
 
   const filteredProducts = productsList.filter((item) => {
+    if (hasCategoryFilter && normalizeCategory(item.category) !== selectedCategory) {
+      return false;
+    }
     if (!cleanSearch) return true;
     const matchCode = item.code?.toLowerCase().includes(cleanSearch);
     const matchName = item.name?.toLowerCase().includes(cleanSearch);
@@ -1236,14 +1373,46 @@ export default function App() {
 
       {/* CATÁLOGO DE PRODUTOS */}
       <main className="main-content">
+        {!loading && !errorMessage && productsList.length > 0 && (
+          <nav className="category-nav" aria-label="Filtrar produtos por categoria">
+            <div className="category-list">
+              {availableCategories.map((category) => {
+                const isSelected = selectedCategory === category;
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    className={`category-chip ${isSelected ? 'active' : ''}`}
+                    aria-pressed={isSelected}
+                    onClick={() => setSelectedCategory(category)}
+                  >
+                    {category}
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
+        )}
+
         <div className="filter-bar">
           <p className="filter-summary">
-            Mostrando <span className="filter-count">{filteredProducts.length}</span> produtos
+            Mostrando <span className="filter-count">{filteredProducts.length}</span>{' '}
+            {filteredProducts.length === 1 ? 'produto' : 'produtos'}
+            {hasCategoryFilter && (
+              <span>
+                {' '}
+                em <strong>{selectedCategory}</strong>
+              </span>
+            )}
             {cleanSearch && <span> para "{searchTerm}"</span>}
           </p>
-          {cleanSearch && (
+          {hasActiveFilters && (
             <button
-              onClick={() => setSearchTerm('')}
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedCategory(ALL_CATEGORIES_FILTER);
+              }}
               style={{
                 background: 'none',
                 border: 'none',
@@ -1253,7 +1422,11 @@ export default function App() {
                 cursor: 'pointer'
               }}
             >
-              Limpar busca
+              {hasCategoryFilter && cleanSearch
+                ? 'Limpar filtros'
+                : hasCategoryFilter
+                ? 'Ver todas as categorias'
+                : 'Limpar busca'}
             </button>
           )}
         </div>
@@ -1290,6 +1463,46 @@ export default function App() {
               Novas ofertas e códigos serão publicados em breve nesta vitrine.
             </p>
           </div>
+        ) : filteredProducts.length === 0 && hasCategoryFilter && cleanSearch ? (
+          <div className="empty-state">
+            <h3 className="empty-title">Nenhum produto encontrado nesta categoria</h3>
+            <p className="empty-desc">
+              Não encontramos produtos em "{selectedCategory}" para "{searchTerm}".
+            </p>
+            <div className="empty-actions">
+              <button
+                type="button"
+                className="btn-reset-search"
+                onClick={() => setSelectedCategory(ALL_CATEGORIES_FILTER)}
+              >
+                Buscar em todas as categorias
+              </button>
+              <button
+                type="button"
+                className="btn-reset-secondary"
+                onClick={() => {
+                  setSelectedCategory(ALL_CATEGORIES_FILTER);
+                  setSearchTerm('');
+                }}
+              >
+                Limpar filtros
+              </button>
+            </div>
+          </div>
+        ) : filteredProducts.length === 0 && hasCategoryFilter ? (
+          <div className="empty-state">
+            <h3 className="empty-title">Nenhum produto nesta categoria</h3>
+            <p className="empty-desc">
+              Não há produtos publicados na categoria "{selectedCategory}" no momento.
+            </p>
+            <button
+              type="button"
+              className="btn-reset-search"
+              onClick={() => setSelectedCategory(ALL_CATEGORIES_FILTER)}
+            >
+              Ver todas as categorias
+            </button>
+          </div>
         ) : filteredProducts.length === 0 ? (
           <div className="empty-state">
             <h3 className="empty-title">Nenhum produto encontrado</h3>
@@ -1297,6 +1510,7 @@ export default function App() {
               Não encontramos nenhum produto com o código ou nome "{searchTerm}".
             </p>
             <button
+              type="button"
               className="btn-reset-search"
               onClick={() => setSearchTerm('')}
             >
@@ -1526,6 +1740,11 @@ export default function App() {
                   <ShieldCheck size={14} strokeWidth={2.5} />
                   <span>Produto Verificado</span>
                 </div>
+              </div>
+
+              <div className="details-category-tag">
+                <Tag size={13} strokeWidth={2.2} />
+                <span>{normalizeCategory(selectedProduct.category)}</span>
               </div>
 
               <h2 className="details-title">{selectedProduct.name}</h2>
