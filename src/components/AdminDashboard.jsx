@@ -1169,7 +1169,7 @@ export default function AdminDashboard({
                     <thead>
                       <tr>
                         <th style={{ width: '60px' }}>Imagem</th>
-                        <th style={{ width: '90px' }}>Código</th>
+                        <th style={{ width: '125px' }}>Código</th>
                         <th>Nome do Produto</th>
                         <th style={{ width: '120px' }}>Preço</th>
                         <th style={{ width: '130px' }}>Marketplace</th>

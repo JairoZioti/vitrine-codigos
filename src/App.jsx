@@ -277,12 +277,23 @@ const cssStyles = `
     transform: scale(1.05);
   }
 
+  /* Faixa superior de badges no card: evita sobreposição entre código (6 chars) e marketplace em telas estreitas */
+  .card-media-badges {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    z-index: 10;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    pointer-events: none;
+  }
+
   /* Badge de Alto Contraste */
   .code-badge {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    z-index: 10;
     background: #0f172a;
     color: #ffffff;
     font-weight: 800;
@@ -295,13 +306,10 @@ const cssStyles = `
     display: flex;
     align-items: center;
     gap: 0.25rem;
+    white-space: nowrap;
   }
 
   .platform-tag {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    z-index: 10;
     font-size: 0.7rem;
     font-weight: 700;
     padding: 0.3rem 0.55rem;
@@ -309,6 +317,7 @@ const cssStyles = `
     text-transform: uppercase;
     letter-spacing: 0.03em;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    white-space: nowrap;
   }
 
   .platform-shopee {
@@ -1214,7 +1223,7 @@ export default function App() {
           <div className="search-container">
             <input
               type="text"
-              placeholder="Digite o código (ex: 001) ou o nome do produto..."
+              placeholder="Digite o código (ex: A7K92B ou 007) ou o nome do produto..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
@@ -1306,15 +1315,17 @@ export default function App() {
                 }}
               >
                 <div className="card-media">
-                  <div className="code-badge">
-                    <span>CÓD: {product.code}</span>
-                  </div>
+                  <div className="card-media-badges">
+                    <div className="code-badge">
+                      <span>CÓD: {product.code}</span>
+                    </div>
 
-                  <span
-                    className={`platform-tag ${getMarketplaceClass(product.platform)}`}
-                  >
-                    {product.platform}
-                  </span>
+                    <span
+                      className={`platform-tag ${getMarketplaceClass(product.platform)}`}
+                    >
+                      {product.platform}
+                    </span>
+                  </div>
 
                   <img
                     src={product.image}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Loader2,
@@ -6,11 +6,13 @@ import {
   AlertCircle,
   PackagePlus,
   Pencil,
-  HelpCircle,
   Info
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SUPPORTED_MARKETPLACES, detectMarketplaceFromUrl } from '../lib/marketplace';
+import { generateProductCode, isProductCodeUniqueViolation } from '../lib/productCode';
+
+const MAX_CODE_ATTEMPTS = 5;
 
 const formModalStyles = `
   .admin-modal-backdrop {
@@ -185,19 +187,6 @@ const formModalStyles = `
     color: #065f46;
   }
 
-  .admin-draft-notice {
-    background: #fffbeb;
-    border: 1px solid #fef3c7;
-    border-radius: 10px;
-    padding: 0.75rem 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8rem;
-    color: #92400e;
-    margin-bottom: 1.25rem;
-  }
-
   .admin-modal-actions {
     display: flex;
     align-items: center;
@@ -312,6 +301,20 @@ const formModalStyles = `
     opacity: 0.5;
     cursor: not-allowed;
   }
+
+  .admin-form-input-readonly {
+    background: #f1f5f9;
+    color: #0f172a;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    cursor: default;
+  }
+
+  .admin-form-input-readonly:focus {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    box-shadow: none;
+  }
 `;
 
 /**
@@ -404,37 +407,58 @@ export default function AdminProductForm({
   const [errorMessage, setErrorMessage] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
 
-  // Carrega os dados do produto quando entra em modo de edição ou reseta ao abrir para novo cadastro
-  // Em edição, preserva integralmente link e marketplace salvos sem disparar preenchimento automático.
+  // Controla transições de abertura para gerar o código uma única vez por abertura de novo cadastro,
+  // sem regenerar acidentalmente em re-renderizações enquanto o modal estiver aberto.
+  const wasOpenRef = useRef(false);
+  const lastProductIdRef = useRef(null);
+
+  // Carrega os dados do produto quando entra em modo de edição ou inicializa novo cadastro com código automático.
+  // Em edição, preserva integralmente link, código e marketplace salvos sem disparar preenchimento automático.
   useEffect(() => {
-    if (isOpen) {
-      if (initialProduct) {
-        setFormData({
-          code: initialProduct.code || '',
-          name: initialProduct.name || '',
-          price: initialProduct.price || '',
-          old_price: initialProduct.old_price || initialProduct.oldPrice || '',
-          platform: initialProduct.platform || '',
-          image: initialProduct.image || '',
-          link: initialProduct.link || ''
-        });
-        setPlatformOrigin('initial');
-      } else {
-        setFormData({
-          code: '',
-          name: '',
-          price: '',
-          old_price: '',
-          platform: '',
-          image: '',
-          link: ''
-        });
-        setPlatformOrigin('none');
-      }
-      setLinkDetection({ status: 'idle', platform: null });
-      setErrorMessage(null);
-      setSuccessMessage(null);
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      lastProductIdRef.current = null;
+      return;
     }
+
+    const currentProductId = initialProduct?.id ?? null;
+    const justOpened = !wasOpenRef.current;
+    const switchedTarget = lastProductIdRef.current !== currentProductId;
+
+    if (!justOpened && !switchedTarget) {
+      return;
+    }
+
+    wasOpenRef.current = true;
+    lastProductIdRef.current = currentProductId;
+
+    if (initialProduct) {
+      setFormData({
+        code: initialProduct.code || '',
+        name: initialProduct.name || '',
+        price: initialProduct.price || '',
+        old_price: initialProduct.old_price || initialProduct.oldPrice || '',
+        platform: initialProduct.platform || '',
+        image: initialProduct.image || '',
+        link: initialProduct.link || ''
+      });
+      setPlatformOrigin('initial');
+    } else {
+      setFormData({
+        code: generateProductCode(),
+        name: '',
+        price: '',
+        old_price: '',
+        platform: '',
+        image: '',
+        link: ''
+      });
+      setPlatformOrigin('none');
+    }
+
+    setLinkDetection({ status: 'idle', platform: null });
+    setErrorMessage(null);
+    setSuccessMessage(null);
   }, [isOpen, initialProduct]);
 
   if (!isOpen) return null;
@@ -575,10 +599,9 @@ export default function AdminProductForm({
 
     try {
       if (isEditing) {
-        // MODO EDIÇÃO: Atualiza exclusivamente os campos cadastrais filtrando por id
-        // Regra estrita: NÃO altera is_active, id, created_at, rating ou reviews
+        // MODO EDIÇÃO: Atualiza exclusivamente os campos editáveis filtrando por id
+        // Regra estrita: NÃO altera code, is_active, id, created_at, rating ou reviews
         const updatePayload = {
-          code: trimmedCode,
           name: trimmedName,
           price: validatedPrice,
           old_price: validatedOldPrice,
@@ -595,11 +618,8 @@ export default function AdminProductForm({
           .single();
 
         if (updateError) {
-          // Código 23505: violação de unicidade (código duplicado)
-          if (updateError.code === '23505') {
-            setErrorMessage(`Já existe outro produto cadastrado com o código "${trimmedCode}".`);
           // Código PGRST116: nenhuma linha correspondeu ao filtro — registro não encontrado
-          } else if (updateError.code === 'PGRST116') {
+          if (updateError.code === 'PGRST116') {
             setErrorMessage('O produto não foi encontrado. Pode ter sido removido. Recarregue a listagem e tente novamente.');
           } else {
             setErrorMessage(updateError.message || 'Erro ao atualizar produto no banco.');
@@ -624,47 +644,65 @@ export default function AdminProductForm({
         }, 700);
       } else {
         // MODO NOVO CADASTRO: Inserção com is_active explicitamente false (Rascunho)
-        const insertPayload = {
-          code: trimmedCode,
-          name: trimmedName,
-          price: validatedPrice,
-          old_price: validatedOldPrice,
-          platform: trimmedPlatform,
-          image: trimmedImage,
-          link: trimmedLink,
-          is_active: false // Regra obrigatória: novo produto sempre nasce como rascunho
-        };
+        // Utiliza a constraint UNIQUE de products.code como fonte definitiva de unicidade,
+        // com retry limitado a MAX_CODE_ATTEMPTS em caso de colisão comprovada no código.
+        let currentCode = trimmedCode;
 
-        const { data: insertedRow, error: insertError } = await supabase
-          .from('products')
-          .insert([insertPayload])
-          .select('id')
-          .single();
+        for (let attempt = 1; attempt <= MAX_CODE_ATTEMPTS; attempt++) {
+          const insertPayload = {
+            code: currentCode,
+            name: trimmedName,
+            price: validatedPrice,
+            old_price: validatedOldPrice,
+            platform: trimmedPlatform,
+            image: trimmedImage,
+            link: trimmedLink,
+            is_active: false // Regra obrigatória: novo produto sempre nasce como rascunho
+          };
 
-        if (insertError) {
-          if (insertError.code === '23505') {
-            setErrorMessage(`Já existe um produto cadastrado com o código "${trimmedCode}".`);
-          } else {
-            setErrorMessage(insertError.message || 'Erro ao cadastrar produto no banco.');
+          const { data: insertedRow, error: insertError } = await supabase
+            .from('products')
+            .insert([insertPayload])
+            .select('id')
+            .single();
+
+          if (!insertError) {
+            // Garantia adicional: só confirma sucesso se o Supabase retornou o id do registro inserido
+            if (!insertedRow?.id) {
+              setErrorMessage('O cadastro não pôde ser confirmado pelo servidor. Verifique a listagem antes de tentar novamente.');
+              return;
+            }
+
+            setSuccessMessage(`Produto cadastrado como rascunho! (CÓD: ${currentCode})`);
+
+            if (onProductSaved) {
+              onProductSaved();
+            }
+
+            setTimeout(() => {
+              onClose();
+            }, 700);
+            return;
           }
+
+          // Retry SOMENTE quando o erro 23505 for comprovadamente violação de unicidade em products.code
+          if (isProductCodeUniqueViolation(insertError)) {
+            if (attempt < MAX_CODE_ATTEMPTS) {
+              currentCode = generateProductCode();
+              setFormData((prev) => ({ ...prev, code: currentCode }));
+              continue;
+            }
+
+            setErrorMessage(
+              'Não foi possível gerar um código único após várias tentativas. Tente novamente em instantes.'
+            );
+            return;
+          }
+
+          // Qualquer outro erro (inclusive 23505 de outra constraint) interrompe imediatamente sem retry
+          setErrorMessage(insertError.message || 'Erro ao cadastrar produto no banco.');
           return;
         }
-
-        // Garantia adicional: só confirma sucesso se o Supabase retornou o id do registro inserido
-        if (!insertedRow?.id) {
-          setErrorMessage('O cadastro não pôde ser confirmado pelo servidor. Verifique a listagem antes de tentar novamente.');
-          return;
-        }
-
-        setSuccessMessage('Produto cadastrado com sucesso como rascunho!');
-
-        if (onProductSaved) {
-          onProductSaved();
-        }
-
-        setTimeout(() => {
-          onClose();
-        }, 700);
       }
     } catch (err) {
       setErrorMessage(err.message || 'Falha inesperada ao comunicar com o banco.');
@@ -716,13 +754,6 @@ export default function AdminProductForm({
           <div className="admin-form-alert admin-alert-success" role="status">
             <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
             <span>{successMessage}</span>
-          </div>
-        )}
-
-        {!isEditing && (
-          <div className="admin-draft-notice">
-            <HelpCircle size={16} style={{ flexShrink: 0 }} />
-            <span>Status inicial automático: <strong>Rascunho</strong> (invisível para clientes).</span>
           </div>
         )}
 
@@ -809,13 +840,17 @@ export default function AdminProductForm({
                 type="text"
                 maxLength={10}
                 required
-                placeholder="Ex: 007"
-                className="admin-form-input"
+                readOnly
+                className="admin-form-input admin-form-input-readonly"
                 value={formData.code}
-                onChange={handleChange}
                 disabled={saving}
+                aria-readonly="true"
               />
-              <p className="admin-form-note">Identificador único exibido no vídeo (máx. 10 caracteres).</p>
+              <p className="admin-form-note">
+                {isEditing
+                  ? 'Código público preservado (não editável).'
+                  : 'Gerado automaticamente (6 caracteres).'}
+              </p>
             </div>
 
             <div className="admin-form-group">
