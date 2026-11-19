@@ -15,11 +15,16 @@ import {
   PackageOpen,
   LogOut,
   Lock,
-  Tag
+  Tag,
+  Info
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { loginWithPassword, logout, verifyAdminStatus, getCurrentUser } from './lib/auth.js';
-import { getMarketplaceClass } from './lib/marketplace.js';
+import {
+  getMarketplaceClass,
+  getMarketplaceOfferLabel,
+  isSafeExternalUrl
+} from './lib/marketplace.js';
 import {
   ALL_CATEGORIES_FILTER,
   DEFAULT_CATEGORY,
@@ -373,18 +378,24 @@ const cssStyles = `
     width: 100%;
     aspect-ratio: 1 / 1;
     overflow: hidden;
-    background-color: #f1f5f9;
+    background-color: #ffffff;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .card-img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+    object-position: center;
+    padding: 0.5rem;
     transition: transform 0.35s ease;
   }
 
   .product-card:hover .card-img {
-    transform: scale(1.05);
+    transform: scale(1.04);
   }
 
   /* Faixa superior de badges no card: evita sobreposição entre código (6 chars) e marketplace em telas estreitas */
@@ -681,20 +692,30 @@ const cssStyles = `
     max-width: 640px;
     width: 100%;
     margin: 0 auto;
-    padding-bottom: 130px;
+    padding-bottom: 140px;
   }
 
   .details-media-container {
     position: relative;
     width: 100%;
+    max-height: min(60vh, 480px);
     aspect-ratio: 1 / 1;
-    background: #f8fafc;
+    background-color: #ffffff;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
   }
 
   .details-img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    max-height: min(60vh, 480px);
+    object-fit: contain;
+    object-position: center;
+    padding: 0.75rem;
+    display: block;
   }
 
   .details-code-badge {
@@ -708,6 +729,11 @@ const cssStyles = `
     letter-spacing: 0.05em;
     padding: 0.45rem 0.85rem;
     border-radius: 8px;
+    border: 1.5px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    z-index: 5;
+    pointer-events: none;
+  }
     border: 1.5px solid rgba(255, 255, 255, 0.3);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
   }
@@ -802,52 +828,77 @@ const cssStyles = `
   }
 
   .details-price-badge {
-    margin-top: 0.5rem;
+    margin-top: 0.65rem;
     display: inline-block;
-    background: #ea580c;
-    color: #ffffff;
+    background: #fff7ed;
+    color: #9a3412;
+    border: 1px solid #fed7aa;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.35rem 0.65rem;
+    border-radius: 8px;
+    line-height: 1.35;
+  }
+
+  .destination-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    padding: 0.3rem 0.65rem;
+    border-radius: 9999px;
     font-size: 0.75rem;
-    font-weight: 800;
-    padding: 0.25rem 0.6rem;
-    border-radius: 6px;
-    text-transform: uppercase;
+    font-weight: 700;
   }
 
   .security-card {
     display: flex;
     align-items: flex-start;
     gap: 0.9rem;
-    background: #f0fdf4;
-    border: 1.5px solid #86efac;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
     padding: 1.1rem;
     border-radius: 12px;
     margin-bottom: 1.5rem;
   }
 
   .security-icon-circle {
-    background: #22c55e;
+    background: #0f172a;
     color: #ffffff;
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    box-shadow: 0 4px 10px rgba(34, 197, 94, 0.25);
   }
 
   .security-text-box h4 {
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     font-weight: 800;
-    color: #14532d;
-    margin-bottom: 0.2rem;
+    color: #0f172a;
+    margin-bottom: 0.25rem;
   }
 
   .security-text-box p {
+    font-size: 0.82rem;
+    color: #475569;
+    line-height: 1.45;
+  }
+
+  .public-footer {
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 2rem;
+    border-top: 1px solid #e2e8f0;
+    text-align: center;
     font-size: 0.8rem;
-    color: #166534;
-    line-height: 1.35;
+    color: #64748b;
+    line-height: 1.5;
   }
 
   .bottom-action-bar {
@@ -876,12 +927,11 @@ const cssStyles = `
     align-items: center;
     justify-content: center;
     gap: 0.65rem;
-    padding: 1.15rem 1.5rem;
+    padding: 1.1rem 1.5rem;
     border-radius: 14px;
-    font-size: 1.1rem;
-    font-weight: 900;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
     box-shadow: 0 8px 20px -2px rgba(234, 88, 12, 0.45);
     border: none;
     cursor: pointer;
@@ -894,6 +944,28 @@ const cssStyles = `
 
   .btn-cta-buy:active {
     transform: scale(0.98);
+  }
+
+  .btn-cta-buy:focus-visible {
+    outline: 3px solid #0f172a;
+    outline-offset: 2px;
+  }
+
+  .btn-cta-unavailable {
+    width: 100%;
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1.5px solid #cbd5e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.05rem 1.25rem;
+    border-radius: 14px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: not-allowed;
+    text-align: center;
   }
 
   /* Modal do Painel de Cadastro Rápido */
@@ -1300,6 +1372,21 @@ export default function App() {
   const hasCategoryFilter = selectedCategory !== ALL_CATEGORIES_FILTER;
   const hasActiveFilters = Boolean(cleanSearch) || hasCategoryFilter;
 
+  // Exibe estrelas/avaliações somente quando houver dados numéricos reais no registro (sem fallbacks fictícios)
+  const hasValidRating = (item) => {
+    const rating = Number(item?.rating);
+    const reviews = Number(item?.reviews);
+    return (
+      item?.rating != null &&
+      item?.reviews != null &&
+      Number.isFinite(rating) &&
+      rating > 0 &&
+      rating <= 5 &&
+      Number.isFinite(reviews) &&
+      reviews > 0
+    );
+  };
+
   const filteredProducts = productsList.filter((item) => {
     if (hasCategoryFilter && normalizeCategory(item.category) !== selectedCategory) {
       return false;
@@ -1350,8 +1437,8 @@ export default function App() {
 
             <div className="header-actions">
               <div className="verified-badge">
-                <ShieldCheck size={14} strokeWidth={2.5} />
-                <span>Verificados</span>
+                <Tag size={14} strokeWidth={2.5} />
+                <span>Ofertas selecionadas</span>
               </div>
             </div>
           </div>
@@ -1550,14 +1637,16 @@ export default function App() {
                 </div>
 
                 <div className="card-body">
-                  <div className="card-rating-row">
-                    <span className="star-badge">
-                      <Star size={14} fill="#eab308" color="#eab308" />
-                      {product.rating || 4.8}
-                    </span>
-                    <span>•</span>
-                    <span>({product.reviews || 120} avaliações)</span>
-                  </div>
+                  {hasValidRating(product) && (
+                    <div className="card-rating-row">
+                      <span className="star-badge">
+                        <Star size={14} fill="#eab308" color="#eab308" />
+                        {product.rating}
+                      </span>
+                      <span>•</span>
+                      <span>({product.reviews} avaliações)</span>
+                    </div>
+                  )}
 
                   <h2 className="card-title" title={product.name}>
                     {product.name}
@@ -1573,7 +1662,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <button className="btn-view-details">
+                  <button type="button" className="btn-view-details">
                     <span>Ver detalhes</span>
                     <ExternalLink size={15} strokeWidth={2.2} />
                   </button>
@@ -1583,6 +1672,10 @@ export default function App() {
           </div>
         )}
       </main>
+
+      <footer className="public-footer">
+        A Vitrine Oficial divulga produtos de lojas e marketplaces. Alguns links são de afiliados, e podemos receber comissão por compras qualificadas.
+      </footer>
 
       {/* MODAL DE CADASTRO RÁPIDO (+ PRODUTO) */}
       {isModalOpen && (
@@ -1736,36 +1829,38 @@ export default function App() {
                   {selectedProduct.platform}
                 </span>
 
-                <div className="verified-badge">
-                  <ShieldCheck size={14} strokeWidth={2.5} />
-                  <span>Produto Verificado</span>
+                <div className="destination-badge">
+                  <ExternalLink size={13} strokeWidth={2.3} aria-hidden="true" />
+                  <span>Loja de destino</span>
                 </div>
               </div>
 
               <div className="details-category-tag">
-                <Tag size={13} strokeWidth={2.2} />
+                <Tag size={13} strokeWidth={2.2} aria-hidden="true" />
                 <span>{normalizeCategory(selectedProduct.category)}</span>
               </div>
 
               <h2 className="details-title">{selectedProduct.name}</h2>
 
-              <div className="details-reviews-row">
-                <div className="stars-group">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      size={17}
-                      fill={i < Math.floor(selectedProduct.rating || 4.8) ? '#f59e0b' : 'none'}
-                      color="#f59e0b"
-                      strokeWidth={2}
-                    />
-                  ))}
+              {hasValidRating(selectedProduct) && (
+                <div className="details-reviews-row">
+                  <div className="stars-group">
+                    {[...Array(5)].map((_, i) => (
+                      <Star
+                        key={i}
+                        size={17}
+                        fill={i < Math.floor(Number(selectedProduct.rating)) ? '#f59e0b' : 'none'}
+                        color="#f59e0b"
+                        strokeWidth={2}
+                      />
+                    ))}
+                  </div>
+                  <span className="rating-score">{selectedProduct.rating}</span>
+                  <span className="reviews-count">
+                    ({selectedProduct.reviews} avaliações)
+                  </span>
                 </div>
-                <span className="rating-score">{selectedProduct.rating || 4.8}</span>
-                <span className="reviews-count">
-                  ({selectedProduct.reviews || 120} clientes satisfeitos)
-                </span>
-              </div>
+              )}
 
               <div className="details-pricing-card">
                 {selectedProduct.oldPrice && (
@@ -1778,19 +1873,18 @@ export default function App() {
                   <span className="amount">{selectedProduct.price}</span>
                 </div>
                 <span className="details-price-badge">
-                  OFERTA ESPECIAL POR TEMPO LIMITADO
+                  Preço e disponibilidade sujeitos à alteração na loja de destino
                 </span>
               </div>
 
               <div className="security-card">
-                <div className="security-icon-circle">
-                  <ShieldCheck size={22} strokeWidth={2.5} />
+                <div className="security-icon-circle" aria-hidden="true">
+                  <Info size={20} strokeWidth={2.3} />
                 </div>
                 <div className="security-text-box">
-                  <h4>Compra 100% segura via {selectedProduct.platform}</h4>
+                  <h4>Compra realizada na loja de destino</h4>
                   <p>
-                    Transação protegida pela garantia oficial da plataforma com
-                    direito a reembolso integral e entrega monitorada.
+                    A Vitrine Oficial divulga produtos de lojas e marketplaces. Ao acessar a oferta, a compra, o pagamento e a entrega ocorrem diretamente em {selectedProduct.platform || 'loja parceira'}, conforme as condições da própria plataforma. Alguns links são de afiliados, e podemos receber comissão por compras qualificadas.
                   </p>
                 </div>
               </div>
@@ -1800,16 +1894,28 @@ export default function App() {
           {/* BARRA FIXA INFERIOR (BOTTOM BAR) */}
           <aside className="bottom-action-bar">
             <div className="bottom-bar-inner">
-              <a
-                href={selectedProduct.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-cta-buy"
-              >
-                <ShoppingBag size={22} strokeWidth={2.5} />
-                <span>COMPRAR NO APLICATIVO</span>
-                <ExternalLink size={18} strokeWidth={2.5} />
-              </a>
+              {isSafeExternalUrl(selectedProduct.link) ? (
+                <a
+                  href={selectedProduct.link.trim()}
+                  target="_blank"
+                  rel="noopener noreferrer sponsored"
+                  className="btn-cta-buy"
+                  aria-label={`${getMarketplaceOfferLabel(selectedProduct.platform)} (abre em nova aba)`}
+                >
+                  <ShoppingBag size={22} strokeWidth={2.5} aria-hidden="true" />
+                  <span>{getMarketplaceOfferLabel(selectedProduct.platform)}</span>
+                  <ExternalLink size={18} strokeWidth={2.5} aria-hidden="true" />
+                </a>
+              ) : (
+                <div
+                  className="btn-cta-unavailable"
+                  role="status"
+                  aria-disabled="true"
+                >
+                  <AlertCircle size={18} strokeWidth={2.2} aria-hidden="true" />
+                  <span>Link da oferta indisponível no momento</span>
+                </div>
+              )}
             </div>
           </aside>
         </div>

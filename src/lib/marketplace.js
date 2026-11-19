@@ -121,3 +121,50 @@ export function getMarketplaceClass(platform) {
       return 'platform-default';
   }
 }
+
+/**
+ * Retorna o texto contextual do botão de oferta conforme o marketplace.
+ *
+ * @param {string | null | undefined} platform
+ * @returns {string}
+ */
+export function getMarketplaceOfferLabel(platform) {
+  switch (platform) {
+    case 'Shopee':
+      return 'Ver oferta na Shopee';
+    case 'Mercado Livre':
+      return 'Ver oferta no Mercado Livre';
+    case 'Amazon':
+      return 'Ver oferta na Amazon';
+    default:
+      return 'Ver oferta na loja de destino';
+  }
+}
+
+/**
+ * Valida se a URL externa usa exclusivamente protocolo http: ou https:
+ * e possui hostname válido, sem modificar a string original.
+ *
+ * @param {string | null | undefined} rawUrl
+ * @returns {boolean}
+ */
+export function isSafeExternalUrl(rawUrl) {
+  if (typeof rawUrl !== 'string') {
+    return false;
+  }
+
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    return (
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+      Boolean(parsed.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
