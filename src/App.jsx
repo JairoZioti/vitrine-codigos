@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { loginWithPassword, logout, verifyAdminStatus, getCurrentUser } from './lib/auth.js';
+import { getMarketplaceClass } from './lib/marketplace.js';
 import AdminLogin from './components/AdminLogin.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 
@@ -319,6 +320,17 @@ const cssStyles = `
     background: #ffe600;
     color: #2d3277;
     font-weight: 800;
+  }
+
+  .platform-amazon {
+    background: #232f3e;
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .platform-default {
+    background: #475569;
+    color: #ffffff;
   }
 
   .card-body {
@@ -1299,11 +1311,7 @@ export default function App() {
                   </div>
 
                   <span
-                    className={`platform-tag ${
-                      product.platform === 'Shopee'
-                        ? 'platform-shopee'
-                        : 'platform-mercadolivre'
-                    }`}
+                    className={`platform-tag ${getMarketplaceClass(product.platform)}`}
                   >
                     {product.platform}
                   </span>
@@ -1498,11 +1506,7 @@ export default function App() {
             <div className="details-info-section">
               <div className="details-platform-row">
                 <span
-                  className={`platform-pill-badge ${
-                    selectedProduct.platform === 'Shopee'
-                      ? 'platform-shopee'
-                      : 'platform-mercadolivre'
-                  }`}
+                  className={`platform-pill-badge ${getMarketplaceClass(selectedProduct.platform)}`}
                 >
                   {selectedProduct.platform}
                 </span>

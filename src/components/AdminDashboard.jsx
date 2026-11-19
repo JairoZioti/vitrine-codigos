@@ -16,6 +16,7 @@ import {
   Tag
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { getMarketplaceClass } from '../lib/marketplace';
 import AdminProductForm from './AdminProductForm';
 
 const dashboardStyles = `
@@ -447,6 +448,12 @@ const dashboardStyles = `
     background: #fefce8;
     color: #854d0e;
     border: 1px solid #fef08a;
+  }
+
+  .platform-amazon {
+    background: #232f3e;
+    color: #ffffff;
+    border: 1px solid #131921;
   }
 
   .platform-default {
@@ -1194,13 +1201,7 @@ export default function AdminDashboard({
                           </td>
                           <td>
                             <span
-                              className={`admin-platform-badge ${
-                                prod.platform === 'Shopee'
-                                  ? 'platform-shopee'
-                                  : prod.platform === 'Mercado Livre'
-                                  ? 'platform-mercadolivre'
-                                  : 'platform-default'
-                              }`}
+                              className={`admin-platform-badge ${getMarketplaceClass(prod.platform)}`}
                             >
                               {prod.platform}
                             </span>
@@ -1304,13 +1305,7 @@ export default function AdminDashboard({
                         <div className="admin-mobile-footer">
                           <span className="admin-product-price">R$ {prod.price}</span>
                           <span
-                            className={`admin-platform-badge ${
-                              prod.platform === 'Shopee'
-                                ? 'platform-shopee'
-                                : prod.platform === 'Mercado Livre'
-                                ? 'platform-mercadolivre'
-                                : 'platform-default'
-                            }`}
+                            className={`admin-platform-badge ${getMarketplaceClass(prod.platform)}`}
                           >
                             {prod.platform}
                           </span>

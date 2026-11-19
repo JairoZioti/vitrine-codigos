@@ -6,9 +6,11 @@ import {
   AlertCircle,
   PackagePlus,
   Pencil,
-  HelpCircle
+  HelpCircle,
+  Info
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { SUPPORTED_MARKETPLACES, detectMarketplaceFromUrl } from '../lib/marketplace';
 
 const formModalStyles = `
   .admin-modal-backdrop {
@@ -249,6 +251,67 @@ const formModalStyles = `
     cursor: not-allowed;
     box-shadow: none;
   }
+
+  /* Feedback discreto da identificação automática de marketplace pelo link */
+  .admin-link-feedback {
+    margin-top: 0.45rem;
+    padding: 0.5rem 0.7rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .admin-link-feedback-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .admin-link-feedback-detected {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+  }
+
+  .admin-link-feedback-hint {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+  }
+
+  .admin-link-feedback-suggestion {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+  }
+
+  .btn-apply-platform {
+    background: #ffffff;
+    border: 1px solid #d97706;
+    color: #b45309;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+
+  .btn-apply-platform:hover:not(:disabled) {
+    background: #fef3c7;
+    color: #78350f;
+  }
+
+  .btn-apply-platform:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 /**
@@ -327,16 +390,22 @@ export default function AdminProductForm({
     name: '',
     price: '',
     old_price: '',
-    platform: 'Shopee',
+    platform: '',
     image: '',
     link: ''
   });
+
+  // Origem da seleção atual de marketplace: 'none' | 'auto' | 'manual' | 'initial'
+  const [platformOrigin, setPlatformOrigin] = useState('none');
+  // Resultado da última análise local do link digitado/colado
+  const [linkDetection, setLinkDetection] = useState({ status: 'idle', platform: null });
 
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
 
   // Carrega os dados do produto quando entra em modo de edição ou reseta ao abrir para novo cadastro
+  // Em edição, preserva integralmente link e marketplace salvos sem disparar preenchimento automático.
   useEffect(() => {
     if (isOpen) {
       if (initialProduct) {
@@ -345,21 +414,24 @@ export default function AdminProductForm({
           name: initialProduct.name || '',
           price: initialProduct.price || '',
           old_price: initialProduct.old_price || initialProduct.oldPrice || '',
-          platform: initialProduct.platform || 'Shopee',
+          platform: initialProduct.platform || '',
           image: initialProduct.image || '',
           link: initialProduct.link || ''
         });
+        setPlatformOrigin('initial');
       } else {
         setFormData({
           code: '',
           name: '',
           price: '',
           old_price: '',
-          platform: 'Shopee',
+          platform: '',
           image: '',
           link: ''
         });
+        setPlatformOrigin('none');
       }
+      setLinkDetection({ status: 'idle', platform: null });
       setErrorMessage(null);
       setSuccessMessage(null);
     }
@@ -369,8 +441,66 @@ export default function AdminProductForm({
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === 'platform') {
+      setFormData((prev) => ({ ...prev, platform: value }));
+      setPlatformOrigin(value ? 'manual' : 'none');
+      if (errorMessage) setErrorMessage(null);
+      return;
+    }
+
+    if (name === 'link') {
+      const trimmed = value.trim();
+
+      if (!trimmed) {
+        setLinkDetection({ status: 'idle', platform: null });
+        if (!isEditing && platformOrigin === 'auto') {
+          setFormData((prev) => ({ ...prev, link: value, platform: '' }));
+          setPlatformOrigin('none');
+        } else {
+          setFormData((prev) => ({ ...prev, link: value }));
+        }
+        if (errorMessage) setErrorMessage(null);
+        return;
+      }
+
+      const detection = detectMarketplaceFromUrl(trimmed);
+      setLinkDetection(detection);
+
+      if (detection.status === 'detected') {
+        // Novo cadastro sem escolha manual: aplica automaticamente a plataforma identificada
+        if (!isEditing && platformOrigin !== 'manual') {
+          setFormData((prev) => ({ ...prev, link: value, platform: detection.platform }));
+          setPlatformOrigin('auto');
+        } else {
+          // Edição ou escolha manual anterior: não sobrescreve silenciosamente
+          setFormData((prev) => ({ ...prev, link: value }));
+        }
+      } else {
+        // Link desconhecido, encurtador genérico ou ainda inválido:
+        // se o marketplace atual veio de detecção automática anterior, limpa para não induzir erro
+        if (!isEditing && platformOrigin === 'auto') {
+          setFormData((prev) => ({ ...prev, link: value, platform: '' }));
+          setPlatformOrigin('none');
+        } else {
+          setFormData((prev) => ({ ...prev, link: value }));
+        }
+      }
+
+      if (errorMessage) setErrorMessage(null);
+      return;
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errorMessage) setErrorMessage(null);
+  };
+
+  const handleApplyDetectedPlatform = () => {
+    if (linkDetection.status === 'detected' && linkDetection.platform) {
+      setFormData((prev) => ({ ...prev, platform: linkDetection.platform }));
+      setPlatformOrigin(isEditing ? 'manual' : 'auto');
+      if (errorMessage) setErrorMessage(null);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -378,7 +508,17 @@ export default function AdminProductForm({
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    // Validações obrigatórias
+    // Validações obrigatórias (acompanhando a ordem visual do formulário)
+    const trimmedLink = formData.link.trim();
+    if (!trimmedLink) {
+      setErrorMessage('O link de afiliado é obrigatório.');
+      return;
+    }
+    if (!isValidHttpUrl(trimmedLink)) {
+      setErrorMessage('O link de afiliado deve ser uma URL válida iniciando com http:// ou https://');
+      return;
+    }
+
     const trimmedCode = formData.code.trim();
     if (!trimmedCode) {
       setErrorMessage('O código do produto é obrigatório.');
@@ -386,6 +526,12 @@ export default function AdminProductForm({
     }
     if (trimmedCode.length > 10) {
       setErrorMessage('O código do produto deve ter no máximo 10 caracteres.');
+      return;
+    }
+
+    const trimmedPlatform = formData.platform ? formData.platform.trim() : '';
+    if (!trimmedPlatform) {
+      setErrorMessage('Selecione o marketplace do produto.');
       return;
     }
 
@@ -425,16 +571,6 @@ export default function AdminProductForm({
       return;
     }
 
-    const trimmedLink = formData.link.trim();
-    if (!trimmedLink) {
-      setErrorMessage('O link de afiliado é obrigatório.');
-      return;
-    }
-    if (!isValidHttpUrl(trimmedLink)) {
-      setErrorMessage('O link de afiliado deve ser uma URL válida iniciando com http:// ou https://');
-      return;
-    }
-
     setSaving(true);
 
     try {
@@ -446,7 +582,7 @@ export default function AdminProductForm({
           name: trimmedName,
           price: validatedPrice,
           old_price: validatedOldPrice,
-          platform: formData.platform,
+          platform: trimmedPlatform,
           image: trimmedImage,
           link: trimmedLink
         };
@@ -493,7 +629,7 @@ export default function AdminProductForm({
           name: trimmedName,
           price: validatedPrice,
           old_price: validatedOldPrice,
-          platform: formData.platform,
+          platform: trimmedPlatform,
           image: trimmedImage,
           link: trimmedLink,
           is_active: false // Regra obrigatória: novo produto sempre nasce como rascunho
@@ -591,6 +727,77 @@ export default function AdminProductForm({
         )}
 
         <form onSubmit={handleSubmit} noValidate>
+          <div className="admin-form-group">
+            <label className="admin-form-label" htmlFor="product-link">
+              Link de Afiliado <span className="required-star">*</span>
+            </label>
+            <input
+              id="product-link"
+              name="link"
+              type="url"
+              required
+              placeholder="https://mercadolivre.com/..., https://shope.ee/... ou https://amzn.to/..."
+              className="admin-form-input"
+              value={formData.link}
+              onChange={handleChange}
+              disabled={saving}
+              autoFocus={!isEditing}
+            />
+
+            {!isEditing &&
+              platformOrigin === 'auto' &&
+              linkDetection.status === 'detected' &&
+              formData.platform === linkDetection.platform && (
+                <div className="admin-link-feedback admin-link-feedback-detected" role="status">
+                  <span className="admin-link-feedback-text">
+                    <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
+                    <span>
+                      Marketplace identificado pelo link: <strong>{linkDetection.platform}</strong>.
+                    </span>
+                  </span>
+                </div>
+              )}
+
+            {linkDetection.status === 'detected' &&
+              linkDetection.platform &&
+              formData.platform !== linkDetection.platform && (
+                <div className="admin-link-feedback admin-link-feedback-suggestion" role="status">
+                  <span className="admin-link-feedback-text">
+                    <Info size={14} style={{ flexShrink: 0 }} />
+                    <span>
+                      Link identificado como <strong>{linkDetection.platform}</strong>.
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-apply-platform"
+                    onClick={handleApplyDetectedPlatform}
+                    disabled={saving}
+                  >
+                    Aplicar {linkDetection.platform}
+                  </button>
+                </div>
+              )}
+
+            {linkDetection.status === 'shortener_generic' && (
+              <div className="admin-link-feedback admin-link-feedback-hint" role="status">
+                <span className="admin-link-feedback-text">
+                  <Info size={14} style={{ flexShrink: 0 }} />
+                  <span>Link encurtado genérico — selecione o marketplace manualmente.</span>
+                </span>
+              </div>
+            )}
+
+            {linkDetection.status === 'unknown' && (
+              <div className="admin-link-feedback admin-link-feedback-hint" role="status">
+                <span className="admin-link-feedback-text">
+                  <Info size={14} style={{ flexShrink: 0 }} />
+                  <span>Domínio não reconhecido automaticamente — selecione o marketplace manualmente.</span>
+                </span>
+              </div>
+            )}
+          </div>
+
           <div className="admin-form-grid-2">
             <div className="admin-form-group">
               <label className="admin-form-label" htmlFor="product-code">
@@ -607,7 +814,6 @@ export default function AdminProductForm({
                 value={formData.code}
                 onChange={handleChange}
                 disabled={saving}
-                autoFocus={!isEditing}
               />
               <p className="admin-form-note">Identificador único exibido no vídeo (máx. 10 caracteres).</p>
             </div>
@@ -619,13 +825,21 @@ export default function AdminProductForm({
               <select
                 id="product-platform"
                 name="platform"
+                required
                 className="admin-form-select"
                 value={formData.platform}
                 onChange={handleChange}
                 disabled={saving}
               >
-                <option value="Shopee">Shopee</option>
-                <option value="Mercado Livre">Mercado Livre</option>
+                <option value="">Selecione o marketplace</option>
+                {SUPPORTED_MARKETPLACES.map((marketplace) => (
+                  <option key={marketplace} value={marketplace}>
+                    {marketplace}
+                  </option>
+                ))}
+                {formData.platform && !SUPPORTED_MARKETPLACES.includes(formData.platform) && (
+                  <option value={formData.platform}>{formData.platform}</option>
+                )}
               </select>
             </div>
           </div>
@@ -695,23 +909,6 @@ export default function AdminProductForm({
               placeholder="https://images.unsplash.com/... ou https://..."
               className="admin-form-input"
               value={formData.image}
-              onChange={handleChange}
-              disabled={saving}
-            />
-          </div>
-
-          <div className="admin-form-group">
-            <label className="admin-form-label" htmlFor="product-link">
-              Link de Afiliado <span className="required-star">*</span>
-            </label>
-            <input
-              id="product-link"
-              name="link"
-              type="url"
-              required
-              placeholder="https://shope.ee/... ou https://mercadolivre.com/..."
-              className="admin-form-input"
-              value={formData.link}
               onChange={handleChange}
               disabled={saving}
             />
