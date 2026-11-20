@@ -35,6 +35,11 @@ import AdminLogin from './components/AdminLogin.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 
 const cssStyles = `
+  :root {
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
   /* Resets e Escopo */
   *, *::before, *::after {
     box-sizing: border-box;
@@ -45,8 +50,13 @@ const cssStyles = `
   body {
     background-color: #f8fafc;
     color: #0f172a;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button, input, select, textarea {
+    font-family: inherit;
   }
 
   #root {
@@ -417,8 +427,11 @@ const cssStyles = `
   .code-badge {
     background: #0f172a;
     color: #ffffff;
-    font-weight: 800;
-    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0.05em;
     padding: 0.35rem 0.65rem;
     border-radius: 8px;
@@ -507,10 +520,12 @@ const cssStyles = `
   }
 
   .card-old-price {
+    font-family: var(--font-sans);
     font-size: 0.8rem;
     color: #94a3b8;
     text-decoration: line-through;
     line-height: 1;
+    font-variant-numeric: tabular-nums;
   }
 
   .card-price-row {
@@ -518,19 +533,23 @@ const cssStyles = `
     align-items: baseline;
     gap: 0.25rem;
     margin-top: 0.15rem;
+    font-variant-numeric: tabular-nums;
   }
 
   .price-currency {
+    font-family: var(--font-sans);
     font-size: 0.9rem;
     font-weight: 700;
     color: #ea580c;
   }
 
   .price-value {
+    font-family: var(--font-sans);
     font-size: 1.45rem;
-    font-weight: 900;
+    font-weight: 800;
     color: #ea580c;
     letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
   }
 
   .btn-view-details {
@@ -682,9 +701,12 @@ const cssStyles = `
   }
 
   .nav-center-info {
-    font-weight: 800;
-    font-size: 0.875rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.85rem;
     color: #ea580c;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0.05em;
   }
 
@@ -724,8 +746,11 @@ const cssStyles = `
     left: 16px;
     background: #0f172a;
     color: #ffffff;
-    font-size: 0.85rem;
-    font-weight: 800;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0.05em;
     padding: 0.45rem 0.85rem;
     border-radius: 8px;
@@ -733,9 +758,6 @@ const cssStyles = `
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
     z-index: 5;
     pointer-events: none;
-  }
-    border: 1.5px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
   }
 
   .details-info-section {
@@ -802,10 +824,12 @@ const cssStyles = `
   }
 
   .details-old-price-line {
+    font-family: var(--font-sans);
     font-size: 0.95rem;
     color: #94a3b8;
     text-decoration: line-through;
     margin-bottom: 0.2rem;
+    font-variant-numeric: tabular-nums;
   }
 
   .details-main-price {
@@ -813,18 +837,22 @@ const cssStyles = `
     align-items: baseline;
     gap: 0.35rem;
     color: #ea580c;
+    font-variant-numeric: tabular-nums;
   }
 
   .details-main-price .curr {
+    font-family: var(--font-sans);
     font-size: 1.35rem;
-    font-weight: 800;
+    font-weight: 700;
   }
 
   .details-main-price .amount {
+    font-family: var(--font-sans);
     font-size: 2.75rem;
-    font-weight: 900;
+    font-weight: 800;
     letter-spacing: -0.03em;
     line-height: 1;
+    font-variant-numeric: tabular-nums;
   }
 
   .details-price-badge {

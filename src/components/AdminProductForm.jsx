@@ -43,6 +43,14 @@ const formModalStyles = `
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     box-sizing: border-box;
     border: 1px solid #e2e8f0;
+    font-family: var(--font-sans, 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  }
+
+  .admin-modal-card button,
+  .admin-modal-card input,
+  .admin-modal-card select,
+  .admin-modal-card textarea {
+    font-family: inherit;
   }
 
   .admin-modal-header {
@@ -306,7 +314,10 @@ const formModalStyles = `
   .admin-form-input-readonly {
     background: #f1f5f9;
     color: #0f172a;
-    font-weight: 700;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0.06em;
     cursor: default;
   }

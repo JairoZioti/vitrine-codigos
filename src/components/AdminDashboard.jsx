@@ -23,7 +23,7 @@ const dashboardStyles = `
   .admin-dashboard-layout {
     min-height: 100vh;
     background-color: #f8fafc;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--font-sans, 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
     color: #0f172a;
     display: flex;
     flex-direction: column;
@@ -31,6 +31,13 @@ const dashboardStyles = `
     /* Impede que qualquer filho quebre para fora da viewport */
     max-width: 100vw;
     overflow-x: hidden;
+  }
+
+  .admin-dashboard-layout button,
+  .admin-dashboard-layout input,
+  .admin-dashboard-layout select,
+  .admin-dashboard-layout textarea {
+    font-family: inherit;
   }
 
   /* ============================================================
@@ -406,8 +413,11 @@ const dashboardStyles = `
     border-radius: 6px;
     background: #0f172a;
     color: #ffffff;
-    font-weight: 800;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-weight: 600;
     font-size: 0.72rem;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0.05em;
     white-space: nowrap;
   }
@@ -439,9 +449,11 @@ const dashboardStyles = `
   }
 
   .admin-product-price {
-    font-weight: 800;
+    font-family: var(--font-sans, 'Plus Jakarta Sans', sans-serif);
+    font-weight: 700;
     color: #ea580c;
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
 
   .admin-platform-badge {

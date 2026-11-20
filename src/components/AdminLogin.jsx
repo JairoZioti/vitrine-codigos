@@ -19,9 +19,14 @@ const loginStyles = `
     align-items: center;
     padding: 1.5rem 1rem;
     background-color: #f8fafc;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--font-sans, 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
     color: #0f172a;
     box-sizing: border-box;
+  }
+
+  .admin-login-overlay button,
+  .admin-login-overlay input {
+    font-family: inherit;
   }
 
   .admin-login-card {
