@@ -965,7 +965,7 @@ export default function AdminDashboard({
 
       const { data, error: queryError } = await supabase
         .from('products')
-        .select('id, code, name, category, image, price, old_price, platform, link, is_active, created_at')
+        .select('id, code, name, category, image, images, description, price, old_price, platform, link, is_active, created_at')
         .order('created_at', { ascending: false });
 
       if (queryError) {

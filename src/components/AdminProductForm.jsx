@@ -6,7 +6,9 @@ import {
   AlertCircle,
   PackagePlus,
   Pencil,
-  Info
+  Info,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SUPPORTED_MARKETPLACES, detectMarketplaceFromUrl } from '../lib/marketplace';
@@ -327,6 +329,110 @@ const formModalStyles = `
     border-color: #cbd5e1;
     box-shadow: none;
   }
+
+  .admin-form-textarea {
+    width: 100%;
+    padding: 0.75rem 0.9rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    color: #0f172a;
+    background: #ffffff;
+    outline: none;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 95px;
+  }
+
+  .admin-form-textarea:focus {
+    border-color: #ea580c;
+    box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+  }
+
+  .admin-form-textarea:disabled {
+    background: #f8fafc;
+    color: #94a3b8;
+    cursor: not-allowed;
+  }
+
+  .admin-form-label-optional {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #64748b;
+    margin-left: 0.25rem;
+  }
+
+  .additional-images-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin-top: 0.35rem;
+  }
+
+  .additional-image-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .additional-image-input-wrap {
+    flex: 1;
+  }
+
+  .btn-remove-extra-image {
+    background: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .btn-remove-extra-image:hover:not(:disabled) {
+    background: #fecaca;
+    color: #b91c1c;
+    border-color: #fca5a5;
+  }
+
+  .btn-remove-extra-image:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-add-extra-image {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #f1f5f9;
+    color: #334155;
+    border: 1.5px dashed #cbd5e1;
+    padding: 0.55rem 0.95rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-add-extra-image:hover:not(:disabled) {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+    color: #0f172a;
+  }
+
+  .btn-add-extra-image:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 /**
@@ -408,8 +514,12 @@ export default function AdminProductForm({
     old_price: '',
     platform: '',
     image: '',
+    description: '',
     link: ''
   });
+
+  // Lista dinâmica de URLs adicionais para a galeria
+  const [additionalImages, setAdditionalImages] = useState([]);
 
   // Origem da seleção atual de marketplace: 'none' | 'auto' | 'manual' | 'initial'
   const [platformOrigin, setPlatformOrigin] = useState('none');
@@ -454,8 +564,13 @@ export default function AdminProductForm({
         old_price: initialProduct.old_price || initialProduct.oldPrice || '',
         platform: initialProduct.platform || '',
         image: initialProduct.image || '',
+        description: typeof initialProduct.description === 'string' ? initialProduct.description : '',
         link: initialProduct.link || ''
       });
+      const loadedImages = Array.isArray(initialProduct.images)
+        ? initialProduct.images.filter((url) => typeof url === 'string')
+        : [];
+      setAdditionalImages(loadedImages);
       setPlatformOrigin('initial');
     } else {
       setFormData({
@@ -466,8 +581,10 @@ export default function AdminProductForm({
         old_price: '',
         platform: '',
         image: '',
+        description: '',
         link: ''
       });
+      setAdditionalImages([]);
       setPlatformOrigin('none');
     }
 
@@ -475,6 +592,25 @@ export default function AdminProductForm({
     setErrorMessage(null);
     setSuccessMessage(null);
   }, [isOpen, initialProduct]);
+
+  const handleAddImage = () => {
+    setAdditionalImages((prev) => [...prev, '']);
+    if (errorMessage) setErrorMessage(null);
+  };
+
+  const handleAdditionalImageChange = (index, value) => {
+    setAdditionalImages((prev) => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
+    });
+    if (errorMessage) setErrorMessage(null);
+  };
+
+  const handleRemoveAdditionalImage = (index) => {
+    setAdditionalImages((prev) => prev.filter((_, i) => i !== index));
+    if (errorMessage) setErrorMessage(null);
+  };
 
   if (!isOpen) return null;
 
@@ -608,13 +744,50 @@ export default function AdminProductForm({
 
     const trimmedImage = formData.image.trim();
     if (!trimmedImage) {
-      setErrorMessage('A URL da imagem é obrigatória.');
+      setErrorMessage('A URL da imagem principal é obrigatória.');
       return;
     }
     if (!isValidHttpUrl(trimmedImage)) {
-      setErrorMessage('A URL da imagem deve ser um link válido iniciando com http:// ou https://');
+      setErrorMessage('A URL da imagem principal deve ser um link válido iniciando com http:// ou https://');
       return;
     }
+
+    // Validação e saneamento das imagens adicionais
+    const cleanedAdditionalImages = [];
+    const seenUrls = new Set([trimmedImage]);
+
+    for (let i = 0; i < additionalImages.length; i++) {
+      const rawUrl = additionalImages[i];
+      const trimmed = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+
+      // Campo em branco é desconsiderado silenciosamente do payload
+      if (!trimmed) {
+        continue;
+      }
+
+      // Valida se a URL é HTTP/HTTPS válida
+      if (!isValidHttpUrl(trimmed)) {
+        setErrorMessage(`A imagem adicional ${i + 1} deve ser uma URL válida iniciando com http:// ou https://`);
+        return;
+      }
+
+      // Previne duplicações
+      if (seenUrls.has(trimmed)) {
+        if (trimmed === trimmedImage) {
+          setErrorMessage(`A imagem adicional ${i + 1} é idêntica à imagem principal. Evite URLs duplicadas.`);
+        } else {
+          setErrorMessage(`A imagem adicional ${i + 1} está duplicada na lista. Cada imagem deve ser única.`);
+        }
+        return;
+      }
+
+      seenUrls.add(trimmed);
+      cleanedAdditionalImages.push(trimmed);
+    }
+
+    // Normalização da descrição opcional (armazena texto simples ou null quando vazia)
+    const trimmedDescription = formData.description ? formData.description.trim() : '';
+    const validatedDescription = trimmedDescription || null;
 
     setSaving(true);
 
@@ -633,6 +806,8 @@ export default function AdminProductForm({
           old_price: validatedOldPrice,
           platform: trimmedPlatform,
           image: trimmedImage,
+          images: cleanedAdditionalImages,
+          description: validatedDescription,
           link: trimmedLink
         };
 
@@ -687,6 +862,8 @@ export default function AdminProductForm({
             old_price: validatedOldPrice,
             platform: trimmedPlatform,
             image: trimmedImage,
+            images: cleanedAdditionalImages,
+            description: validatedDescription,
             link: trimmedLink,
             is_active: false // Regra obrigatória: novo produto sempre nasce como rascunho
           };
@@ -995,7 +1172,7 @@ export default function AdminProductForm({
 
           <div className="admin-form-group">
             <label className="admin-form-label" htmlFor="product-image">
-              URL da Imagem <span className="required-star">*</span>
+              URL da Imagem Principal <span className="required-star">*</span>
             </label>
             <input
               id="product-image"
@@ -1008,6 +1185,80 @@ export default function AdminProductForm({
               onChange={handleChange}
               disabled={saving}
             />
+            <p className="admin-form-note">
+              Esta imagem é obrigatória e será utilizada como capa e nos cartões do catálogo.
+            </p>
+
+            {/* SEÇÃO DE IMAGENS ADICIONAIS DA GALERIA */}
+            <div style={{ marginTop: '0.85rem' }}>
+              <label className="admin-form-label" style={{ marginBottom: '0.2rem' }}>
+                Imagens adicionais da galeria <span className="admin-form-label-optional">(opcional)</span>
+              </label>
+              <p className="admin-form-note" style={{ marginBottom: '0.5rem' }}>
+                URLs complementares para a galeria da página de detalhes.
+              </p>
+
+              {additionalImages.length > 0 && (
+                <div className="additional-images-container">
+                  {additionalImages.map((imgUrl, index) => (
+                    <div key={index} className="additional-image-row">
+                      <div className="additional-image-input-wrap">
+                        <input
+                          type="url"
+                          placeholder={`https://... (URL da imagem adicional ${index + 1})`}
+                          className="admin-form-input"
+                          value={imgUrl}
+                          onChange={(e) => handleAdditionalImageChange(index, e.target.value)}
+                          disabled={saving}
+                          aria-label={`URL da imagem adicional ${index + 1}`}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-remove-extra-image"
+                        onClick={() => handleRemoveAdditionalImage(index)}
+                        title={`Remover imagem adicional ${index + 1}`}
+                        aria-label={`Remover imagem adicional ${index + 1}`}
+                        disabled={saving}
+                      >
+                        <Trash2 size={16} aria-hidden="true" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="btn-add-extra-image"
+                onClick={handleAddImage}
+                disabled={saving}
+                style={{ marginTop: additionalImages.length > 0 ? '0.6rem' : '0.25rem' }}
+              >
+                <Plus size={15} strokeWidth={2.5} aria-hidden="true" />
+                <span>Adicionar imagem</span>
+              </button>
+            </div>
+          </div>
+
+          {/* SEÇÃO DE DESCRIÇÃO DO PRODUTO (OPCIONAL) */}
+          <div className="admin-form-group">
+            <label className="admin-form-label" htmlFor="product-description">
+              Descrição do produto <span className="admin-form-label-optional">(opcional)</span>
+            </label>
+            <textarea
+              id="product-description"
+              name="description"
+              rows={4}
+              placeholder="Informações detalhadas sobre o produto, características, medidas, materiais, etc."
+              className="admin-form-textarea"
+              value={formData.description}
+              onChange={handleChange}
+              disabled={saving}
+            />
+            <p className="admin-form-note">
+              Texto livre com suporte a quebras de linha e parágrafos.
+            </p>
           </div>
 
           <div className="admin-modal-actions">
