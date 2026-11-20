@@ -33,6 +33,7 @@ import {
 } from './lib/categories.js';
 import AdminLogin from './components/AdminLogin.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
+import ProductGallery from './components/ProductGallery.jsx';
 
 const cssStyles = `
   :root {
@@ -881,6 +882,43 @@ const cssStyles = `
     font-weight: 700;
   }
 
+  .details-description-card {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .details-description-title {
+    font-family: var(--font-sans);
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.01em;
+  }
+
+  .details-description-text {
+    font-family: var(--font-sans);
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: #334155;
+    word-break: break-word;
+  }
+
+  .details-description-paragraph {
+    margin-bottom: 0.65rem;
+  }
+
+  .details-description-paragraph:last-child {
+    margin-bottom: 0;
+  }
+
+  .details-description-spacer {
+    height: 0.5rem;
+  }
+
   .security-card {
     display: flex;
     align-items: flex-start;
@@ -1415,6 +1453,15 @@ export default function App() {
     );
   };
 
+  // Exibe seção de descrição apenas quando houver texto válido não vazio
+  const hasValidDescription = (item) => {
+    return (
+      Boolean(item) &&
+      typeof item.description === 'string' &&
+      item.description.trim().length > 0
+    );
+  };
+
   const filteredProducts = productsList.filter((item) => {
     if (hasCategoryFilter && normalizeCategory(item.category) !== selectedCategory) {
       return false;
@@ -1838,16 +1885,12 @@ export default function App() {
           </header>
 
           <div className="details-body">
-            <div className="details-media-container">
-              <img
-                src={selectedProduct.image}
-                alt={selectedProduct.name}
-                className="details-img"
-              />
-              <div className="details-code-badge">
-                CÓD: {selectedProduct.code}
-              </div>
-            </div>
+            <ProductGallery
+              mainImage={selectedProduct.image}
+              images={selectedProduct.images}
+              productName={selectedProduct.name}
+              productCode={selectedProduct.code}
+            />
 
             <div className="details-info-section">
               <div className="details-platform-row">
@@ -1904,6 +1947,25 @@ export default function App() {
                   Preço e disponibilidade sujeitos à alteração na loja de destino
                 </span>
               </div>
+
+              {hasValidDescription(selectedProduct) && (
+                <div className="details-description-card">
+                  <h3 className="details-description-title">Descrição do produto</h3>
+                  <div className="details-description-text">
+                    {selectedProduct.description.split('\n').map((line, idx) => {
+                      const trimmed = line.trim();
+                      if (!trimmed) {
+                        return <div key={idx} className="details-description-spacer" />;
+                      }
+                      return (
+                        <p key={idx} className="details-description-paragraph">
+                          {trimmed}
+                        </p>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="security-card">
                 <div className="security-icon-circle" aria-hidden="true">
