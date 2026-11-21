@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft,
   ShoppingBag,
@@ -569,6 +569,8 @@ const cssStyles = `
     gap: 0.4rem;
     cursor: pointer;
     transition: all 0.2s ease;
+    text-decoration: none;
+    box-sizing: border-box;
   }
 
   .product-card:hover .btn-view-details {
@@ -1139,9 +1141,34 @@ const cssStyles = `
   }
 `;
 
+/**
+ * Extrai com segurança o código do produto da URL (/produto/:code).
+ * Preserva estritamente strings, inclusive com zeros à esquerda (ex: "007").
+ * Trata sequências percentuais malformadas sem disparar exceção não capturada.
+ */
+function parseProductRoute(pathname) {
+  if (typeof pathname !== 'string') return null;
+  const match = pathname.match(/^\/produto\/([^/?#]+)/i);
+  if (!match) return null;
+
+  try {
+    const raw = match[1];
+    const decoded = decodeURIComponent(raw).trim();
+    return decoded || null;
+  } catch {
+    return match[1].trim() || null;
+  }
+}
+
 export default function App() {
   // Roteamento leve via hash (#admin)
   const [currentHash, setCurrentHash] = useState(() => window.location.hash);
+
+  // Roteamento via History API para URLs individuais de produtos (/produto/:code)
+  const [routeProductCode, setRouteProductCode] = useState(() => parseProductRoute(window.location.pathname));
+
+  // Ref para memorizar a posição de rolagem do catálogo ao abrir um produto
+  const catalogScrollYRef = useRef(0);
 
   // Estados de Autenticação e Autorização Administrativa
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -1170,7 +1197,7 @@ export default function App() {
     link: ''
   });
 
-  // 1. Ouvinte de hashchange para suporte a Voltar/Avançar do navegador
+  // 1a. Ouvinte de hashchange para suporte a Voltar/Avançar do navegador no #admin
   useEffect(() => {
     const handleHashChange = () => {
       setCurrentHash(window.location.hash);
@@ -1182,6 +1209,46 @@ export default function App() {
       window.removeEventListener('hashchange', handleHashChange);
     };
   }, []);
+
+  // 1b. Ouvinte de popstate para navegação com os botões Voltar / Avançar do navegador
+  useEffect(() => {
+    const handlePopState = () => {
+      const code = parseProductRoute(window.location.pathname);
+      setRouteProductCode(code);
+      if (!code) {
+        setSelectedProduct(null);
+        requestAnimationFrame(() => {
+          if (catalogScrollYRef.current > 0) {
+            window.scrollTo({ top: catalogScrollYRef.current, behavior: 'instant' });
+          } else {
+            window.scrollTo({ top: 0, behavior: 'instant' });
+          }
+        });
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
+  // 1c. Sincroniza o produto selecionado quando a lista é carregada ou o código da rota é alterado
+  useEffect(() => {
+    if (!routeProductCode) {
+      setSelectedProduct(null);
+      return;
+    }
+
+    if (productsList.length > 0) {
+      const found = productsList.find((p) => p.code === routeProductCode);
+      if (found) {
+        setSelectedProduct(found);
+      } else {
+        setSelectedProduct(null);
+      }
+    }
+  }, [routeProductCode, productsList]);
 
   // 2. Validação segura e restauração de sessão de administrador
   const checkAdminAccess = async () => {
@@ -1309,11 +1376,65 @@ export default function App() {
     }
   };
 
-  // Navegar de volta à vitrine pública
+  // Navegar de volta à vitrine pública a partir do Admin
   const handleGoToStore = () => {
+    if (window.location.pathname !== '/') {
+      window.history.pushState({}, '', '/');
+    }
     window.location.hash = '';
     setCurrentHash('');
+    setRouteProductCode(null);
+    setSelectedProduct(null);
     setAuthError(null);
+  };
+
+  // Abertura programática de produto com sincronização na URL e History API
+  const handleOpenProduct = (product, e) => {
+    // Se o usuário utilizou modificador (Ctrl, Cmd, Shift) ou clique com botão do meio, permite ação nativa do navegador
+    if (e && (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1)) {
+      return;
+    }
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+
+    // Registra a rolagem atual do catálogo antes da transição para a tela de detalhes
+    catalogScrollYRef.current = window.scrollY;
+
+    const targetUrl = `/produto/${encodeURIComponent(product.code)}`;
+    if (window.location.pathname !== targetUrl) {
+      window.history.pushState(
+        { productCode: product.code, fromCatalog: true },
+        '',
+        targetUrl
+      );
+    }
+
+    setRouteProductCode(product.code);
+    setSelectedProduct(product);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  // Retorno da tela de detalhes para o catálogo respeitando o histórico real
+  const handleBackFromDetails = () => {
+    if (window.history.state?.fromCatalog) {
+      // O visitante chegou ao produto a partir do catálogo nesta mesma sessão:
+      // history.back() retorna à entrada anterior no histórico, disparando popstate e preservando o catálogo
+      window.history.back();
+    } else {
+      // O visitante entrou diretamente pela URL (/produto/:code) ou deu F5:
+      // Navega para '/' sem depender de histórico anterior
+      window.history.pushState({ fromCatalog: false }, '', '/');
+      setRouteProductCode(null);
+      setSelectedProduct(null);
+      requestAnimationFrame(() => {
+        if (catalogScrollYRef.current > 0) {
+          window.scrollTo({ top: catalogScrollYRef.current, behavior: 'instant' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        }
+      });
+    }
   };
 
   // 5. Carregar produtos ativos do Supabase (is_active = true explícito)
@@ -1685,10 +1806,7 @@ export default function App() {
               <article
                 key={product.id || product.code}
                 className="product-card"
-                onClick={() => {
-                  setSelectedProduct(product);
-                  window.scrollTo({ top: 0, behavior: 'instant' });
-                }}
+                onClick={(e) => handleOpenProduct(product, e)}
               >
                 <div className="card-media">
                   <div className="card-media-badges">
@@ -1737,10 +1855,15 @@ export default function App() {
                     </div>
                   </div>
 
-                  <button type="button" className="btn-view-details">
+                  <a
+                    href={`/produto/${encodeURIComponent(product.code)}`}
+                    className="btn-view-details"
+                    onClick={(e) => handleOpenProduct(product, e)}
+                    aria-label={`Ver detalhes de ${product.name}`}
+                  >
                     <span>Ver detalhes</span>
-                    <ExternalLink size={15} strokeWidth={2.2} />
-                  </button>
+                    <ExternalLink size={15} strokeWidth={2.2} aria-hidden="true" />
+                  </a>
                 </div>
               </article>
             ))}
@@ -1866,13 +1989,119 @@ export default function App() {
         </div>
       )}
 
+      {/* TELA DE CARREGAMENTO DIRETO DO PRODUTO (F5 OU ACESSO POR URL) */}
+      {routeProductCode && loading && !selectedProduct && (
+        <div className="details-overlay">
+          <header className="details-nav">
+            <button
+              className="btn-back-nav"
+              onClick={handleBackFromDetails}
+              aria-label="Voltar para a vitrine"
+            >
+              <ArrowLeft size={18} strokeWidth={2.5} />
+              <span>Voltar</span>
+            </button>
+            <span className="nav-center-info">
+              CÓD: {routeProductCode}
+            </span>
+            <div style={{ width: 80 }} />
+          </header>
+
+          <div className="details-body" style={{ textAlign: 'center', paddingTop: '4rem' }}>
+            <Loader2
+              size={36}
+              style={{ margin: '0 auto', animation: 'spin 1s linear infinite', color: '#ea580c' }}
+            />
+            <p style={{ marginTop: '1rem', color: '#64748b', fontWeight: '600' }}>
+              Carregando detalhes do produto...
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* TELA DE ERRO DE CONEXÃO AO CARREGAR PRODUTO */}
+      {routeProductCode && !loading && errorMessage && !selectedProduct && (
+        <div className="details-overlay">
+          <header className="details-nav">
+            <button
+              className="btn-back-nav"
+              onClick={handleBackFromDetails}
+              aria-label="Voltar para a vitrine"
+            >
+              <ArrowLeft size={18} strokeWidth={2.5} />
+              <span>Voltar</span>
+            </button>
+            <span className="nav-center-info">
+              CÓD: {routeProductCode}
+            </span>
+            <div style={{ width: 80 }} />
+          </header>
+
+          <div className="details-body" style={{ textAlign: 'center', paddingTop: '3.5rem', paddingLeft: '1.5rem', paddingRight: '1.5rem' }}>
+            <div className="state-icon-wrap state-icon-error" style={{ margin: '0 auto 1rem' }}>
+              <AlertCircle size={28} />
+            </div>
+            <h3 className="empty-title">Falha na conexão</h3>
+            <p className="empty-desc">
+              Não foi possível carregar as informações do produto. Verifique sua conexão e tente novamente.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button type="button" className="btn-retry" onClick={fetchProducts}>
+                Tentar novamente
+              </button>
+              <button type="button" className="btn-reset-search" onClick={handleBackFromDetails}>
+                Ir para a Vitrine
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TELA DE PRODUTO NÃO ENCONTRADO OU INATIVO */}
+      {routeProductCode && !loading && !errorMessage && !selectedProduct && (
+        <div className="details-overlay">
+          <header className="details-nav">
+            <button
+              className="btn-back-nav"
+              onClick={handleBackFromDetails}
+              aria-label="Voltar para a vitrine"
+            >
+              <ArrowLeft size={18} strokeWidth={2.5} />
+              <span>Voltar</span>
+            </button>
+            <span className="nav-center-info">
+              CÓD: {routeProductCode}
+            </span>
+            <div style={{ width: 80 }} />
+          </header>
+
+          <div className="details-body" style={{ textAlign: 'center', paddingTop: '3.5rem', paddingLeft: '1.5rem', paddingRight: '1.5rem' }}>
+            <div className="state-icon-wrap state-icon-empty" style={{ margin: '0 auto 1rem' }}>
+              <ShoppingBag size={28} />
+            </div>
+            <h3 className="empty-title">Produto não encontrado ou oferta esgotada</h3>
+            <p className="empty-desc">
+              O produto com código <strong>{routeProductCode}</strong> não está disponível ou foi retirado da vitrine.
+            </p>
+            <button
+              type="button"
+              className="btn-reset-search"
+              onClick={handleBackFromDetails}
+              style={{ margin: '0 auto' }}
+            >
+              Ver produtos disponíveis na Vitrine
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* TELA DE DETALHES EM TELA CHEIA */}
       {selectedProduct && (
         <div className="details-overlay">
           <header className="details-nav">
             <button
               className="btn-back-nav"
-              onClick={() => setSelectedProduct(null)}
+              onClick={handleBackFromDetails}
               aria-label="Voltar para a vitrine"
             >
               <ArrowLeft size={18} strokeWidth={2.5} />
