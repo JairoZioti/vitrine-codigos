@@ -16,7 +16,10 @@ import {
   LogOut,
   Lock,
   Tag,
-  Info
+  Info,
+  MessageCircle,
+  Truck,
+  Store
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { loginWithPassword, logout, verifyAdminStatus, getCurrentUser } from './lib/auth.js';
@@ -34,6 +37,7 @@ import {
 import AdminLogin from './components/AdminLogin.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import ProductGallery from './components/ProductGallery.jsx';
+import Footer from './components/Footer.jsx';
 
 const cssStyles = `
   :root {
@@ -46,6 +50,10 @@ const cssStyles = `
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+  }
+
+  html {
+    scrollbar-gutter: stable;
   }
 
   body {
@@ -669,6 +677,7 @@ const cssStyles = `
     overflow-y: auto;
     display: flex;
     flex-direction: column;
+    overscroll-behavior: contain;
   }
 
   .details-nav {
@@ -677,11 +686,17 @@ const cssStyles = `
     background: rgba(255, 255, 255, 0.97);
     backdrop-filter: blur(10px);
     z-index: 60;
+    padding: 0.85rem 1.25rem;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .details-nav-inner {
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.85rem 1.25rem;
-    border-bottom: 1px solid #e2e8f0;
   }
 
   .btn-back-nav {
@@ -713,11 +728,50 @@ const cssStyles = `
     letter-spacing: 0.05em;
   }
 
+  .details-status-body {
+    max-width: 560px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem;
+    text-align: center;
+  }
+
   .details-body {
     max-width: 640px;
     width: 100%;
     margin: 0 auto;
-    padding-bottom: 140px;
+    padding-bottom: 1.25rem;
+    box-sizing: border-box;
+    flex: 1 0 auto;
+  }
+
+  .details-layout-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .details-gallery-area {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .details-buy-area {
+    min-width: 0;
+    padding: 1.5rem 1.25rem 0;
+  }
+
+  .details-description-area {
+    min-width: 0;
+    padding: 0 1.25rem;
+    margin-top: 1.25rem;
+  }
+
+  .details-cta-block {
+    margin-top: 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
   }
 
   .details-media-container {
@@ -819,11 +873,12 @@ const cssStyles = `
   }
 
   .details-pricing-card {
-    background: #fff7ed;
-    border: 1px solid #ffedd5;
-    border-radius: 14px;
-    padding: 1.25rem;
-    margin-bottom: 1.5rem;
+    background: #FFF7ED;
+    border: 1.5px solid #FED7AA;
+    border-radius: 16px;
+    padding: 1.35rem 1.25rem;
+    margin-bottom: 0;
+    box-shadow: 0 4px 16px -2px rgba(234, 88, 12, 0.06);
   }
 
   .details-old-price-line {
@@ -839,7 +894,7 @@ const cssStyles = `
     display: flex;
     align-items: baseline;
     gap: 0.35rem;
-    color: #ea580c;
+    color: #EA580C;
     font-variant-numeric: tabular-nums;
   }
 
@@ -858,17 +913,11 @@ const cssStyles = `
     font-variant-numeric: tabular-nums;
   }
 
-  .details-price-badge {
-    margin-top: 0.65rem;
-    display: inline-block;
-    background: #fff7ed;
-    color: #9a3412;
-    border: 1px solid #fed7aa;
+  .details-price-disclaimer {
+    margin-top: 0.45rem;
     font-size: 0.78rem;
-    font-weight: 600;
-    padding: 0.35rem 0.65rem;
-    border-radius: 8px;
-    line-height: 1.35;
+    color: #475569;
+    line-height: 1.4;
   }
 
   .destination-badge {
@@ -889,7 +938,7 @@ const cssStyles = `
     border: 1.5px solid #e2e8f0;
     border-radius: 12px;
     padding: 1.25rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0;
   }
 
   .details-description-title {
@@ -969,49 +1018,35 @@ const cssStyles = `
     line-height: 1.5;
   }
 
-  .bottom-action-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 120;
-    background: #ffffff;
-    border-top: 1px solid #e2e8f0;
-    padding: 0.85rem 1.25rem;
-    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.12);
-  }
-
-  .bottom-bar-inner {
-    max-width: 640px;
-    margin: 0 auto;
-  }
-
   .btn-cta-buy {
     width: 100%;
-    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    box-sizing: border-box;
+    background: #F97316;
     color: #ffffff;
     text-decoration: none;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.65rem;
-    padding: 1.1rem 1.5rem;
-    border-radius: 14px;
-    font-size: 1.05rem;
+    padding: 1rem 1.35rem;
+    border-radius: 12px;
+    font-size: 1.02rem;
     font-weight: 800;
     letter-spacing: 0.01em;
-    box-shadow: 0 8px 20px -2px rgba(234, 88, 12, 0.45);
     border: none;
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    box-shadow: 0 4px 14px -1px rgba(249, 115, 22, 0.35);
+    transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
   }
 
   .btn-cta-buy:hover {
-    filter: brightness(1.05);
+    background: #EA580C;
+    box-shadow: 0 6px 18px -1px rgba(234, 88, 12, 0.4);
+    transform: translateY(-1px);
   }
 
   .btn-cta-buy:active {
-    transform: scale(0.98);
+    transform: translateY(0);
   }
 
   .btn-cta-buy:focus-visible {
@@ -1021,6 +1056,7 @@ const cssStyles = `
 
   .btn-cta-unavailable {
     width: 100%;
+    box-sizing: border-box;
     background: #f1f5f9;
     color: #64748b;
     border: 1.5px solid #cbd5e1;
@@ -1028,12 +1064,160 @@ const cssStyles = `
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    padding: 1.05rem 1.25rem;
-    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
     font-size: 0.95rem;
     font-weight: 700;
     cursor: not-allowed;
     text-align: center;
+  }
+
+  /* Botão Secundário WhatsApp (Visual apenas, desabilitado) */
+  .btn-share-whatsapp-disabled {
+    width: 100%;
+    box-sizing: border-box;
+    background: #ffffff;
+    border: 1.5px solid #E2E8F0;
+    color: #0F172A;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    cursor: not-allowed;
+    opacity: 0.9;
+    user-select: none;
+  }
+
+  .btn-share-whatsapp-disabled .whatsapp-icon {
+    color: #16A34A;
+    flex-shrink: 0;
+  }
+
+  .btn-share-whatsapp-disabled .badge-coming-soon {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: #f1f5f9;
+    color: #64748b;
+    padding: 0.2rem 0.5rem;
+    border-radius: 9999px;
+    margin-left: 0.25rem;
+  }
+
+  /* Microinformações Institucionais da Buy Box */
+  .buybox-micro-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #FED7AA;
+  }
+
+  @media (max-width: 440px) {
+    .buybox-micro-row {
+      grid-template-columns: 1fr;
+      gap: 0.6rem;
+    }
+  }
+
+  .buybox-micro-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #475569;
+    line-height: 1.25;
+  }
+
+  .buybox-micro-item svg {
+    color: #EA580C;
+    flex-shrink: 0;
+  }
+
+  /* Aviso Único de Afiliados da Buy Box */
+  .buybox-affiliate-notice {
+    margin-top: 0.95rem;
+    font-size: 0.74rem;
+    color: #64748b;
+    line-height: 1.45;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .buybox-affiliate-notice svg {
+    color: #EA580C;
+    flex-shrink: 0;
+  }
+
+  /* Breakpoint Desktop: 2 colunas equilibradas a partir de 960px */
+  @media (min-width: 960px) {
+    .details-body {
+      max-width: 1200px;
+      padding: 2rem 1.5rem 3.5rem;
+    }
+
+    .details-layout-grid {
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+      column-gap: 2.5rem;
+      row-gap: 1.75rem;
+      align-items: start;
+    }
+
+    .details-gallery-area {
+      grid-column: 1;
+      grid-row: 1;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .details-gallery-area .product-gallery-wrapper {
+      border-bottom: none;
+    }
+
+    .details-buy-area {
+      grid-column: 2;
+      grid-row: 1;
+      padding: 0;
+    }
+
+    .details-description-area {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      padding: 0;
+      margin-top: 0.5rem;
+    }
+
+    .details-description-card {
+      padding: 1.75rem 2rem;
+      margin-bottom: 0;
+    }
+
+    .details-description-text {
+      max-width: 82ch;
+      font-size: 0.94rem;
+      line-height: 1.7;
+    }
+
+    .details-title {
+      font-size: 1.55rem;
+      line-height: 1.28;
+    }
+
+    .details-pricing-card {
+      padding: 1.5rem;
+      margin-bottom: 0;
+    }
   }
 
   /* Modal do Painel de Cadastro Rápido */
@@ -1250,6 +1434,31 @@ export default function App() {
     }
   }, [routeProductCode, productsList]);
 
+  // 1d. Bloqueio de rolagem do documento de fundo enquanto a tela de detalhes estiver ativa
+  // Elimina a rolagem vertical duplicada e preserva unicamente a rolagem ativa do contêiner details-overlay
+  const isDetailsOverlayOpen = Boolean(selectedProduct || routeProductCode);
+
+  useEffect(() => {
+    if (!isDetailsOverlayOpen) return;
+
+    // Preservar os estilos prévios de overflow para restauração fidedigna
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+
+    // Bloquear rolagem do documento de fundo
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      // Restaura a posição de rolagem original do catálogo após o desbloqueio do documento
+      if (catalogScrollYRef.current > 0) {
+        window.scrollTo({ top: catalogScrollYRef.current, behavior: 'instant' });
+      }
+    };
+  }, [isDetailsOverlayOpen]);
+
   // 2. Validação segura e restauração de sessão de administrador
   const checkAdminAccess = async () => {
     try {
@@ -1397,6 +1606,9 @@ export default function App() {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
     }
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+    }
 
     // Registra a rolagem atual do catálogo antes da transição para a tela de detalhes
     catalogScrollYRef.current = window.scrollY;
@@ -1412,7 +1624,6 @@ export default function App() {
 
     setRouteProductCode(product.code);
     setSelectedProduct(product);
-    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   // Retorno da tela de detalhes para o catálogo respeitando o histórico real
@@ -1615,6 +1826,28 @@ export default function App() {
       />
     );
   }
+
+  // Navegação a partir do rodapé institucional
+  const handleFooterCategoryClick = (category) => {
+    if (selectedProduct || routeProductCode) {
+      window.history.pushState({ fromCatalog: false }, '', '/');
+      setRouteProductCode(null);
+      setSelectedProduct(null);
+    }
+    setSelectedCategory(category);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleFooterHomeClick = () => {
+    if (selectedProduct || routeProductCode) {
+      window.history.pushState({ fromCatalog: false }, '', '/');
+      setRouteProductCode(null);
+      setSelectedProduct(null);
+    }
+    setSelectedCategory(ALL_CATEGORIES_FILTER);
+    setSearchTerm('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div className="vitrine-app">
@@ -1871,9 +2104,11 @@ export default function App() {
         )}
       </main>
 
-      <footer className="public-footer">
-        A Vitrine Oficial divulga produtos de lojas e marketplaces. Alguns links são de afiliados, e podemos receber comissão por compras qualificadas.
-      </footer>
+      {/* RODAPÉ INSTITUCIONAL NO CATÁLOGO */}
+      <Footer
+        onSelectCategory={handleFooterCategoryClick}
+        onGoHome={handleFooterHomeClick}
+      />
 
       {/* MODAL DE CADASTRO RÁPIDO (+ PRODUTO) */}
       {isModalOpen && (
@@ -1993,21 +2228,23 @@ export default function App() {
       {routeProductCode && loading && !selectedProduct && (
         <div className="details-overlay">
           <header className="details-nav">
-            <button
-              className="btn-back-nav"
-              onClick={handleBackFromDetails}
-              aria-label="Voltar para a vitrine"
-            >
-              <ArrowLeft size={18} strokeWidth={2.5} />
-              <span>Voltar</span>
-            </button>
-            <span className="nav-center-info">
-              CÓD: {routeProductCode}
-            </span>
-            <div style={{ width: 80 }} />
+            <div className="details-nav-inner">
+              <button
+                className="btn-back-nav"
+                onClick={handleBackFromDetails}
+                aria-label="Voltar para a vitrine"
+              >
+                <ArrowLeft size={18} strokeWidth={2.5} />
+                <span>Voltar</span>
+              </button>
+              <span className="nav-center-info">
+                CÓD: {routeProductCode}
+              </span>
+              <div style={{ width: 80 }} />
+            </div>
           </header>
 
-          <div className="details-body" style={{ textAlign: 'center', paddingTop: '4rem' }}>
+          <div className="details-status-body">
             <Loader2
               size={36}
               style={{ margin: '0 auto', animation: 'spin 1s linear infinite', color: '#ea580c' }}
@@ -2023,21 +2260,23 @@ export default function App() {
       {routeProductCode && !loading && errorMessage && !selectedProduct && (
         <div className="details-overlay">
           <header className="details-nav">
-            <button
-              className="btn-back-nav"
-              onClick={handleBackFromDetails}
-              aria-label="Voltar para a vitrine"
-            >
-              <ArrowLeft size={18} strokeWidth={2.5} />
-              <span>Voltar</span>
-            </button>
-            <span className="nav-center-info">
-              CÓD: {routeProductCode}
-            </span>
-            <div style={{ width: 80 }} />
+            <div className="details-nav-inner">
+              <button
+                className="btn-back-nav"
+                onClick={handleBackFromDetails}
+                aria-label="Voltar para a vitrine"
+              >
+                <ArrowLeft size={18} strokeWidth={2.5} />
+                <span>Voltar</span>
+              </button>
+              <span className="nav-center-info">
+                CÓD: {routeProductCode}
+              </span>
+              <div style={{ width: 80 }} />
+            </div>
           </header>
 
-          <div className="details-body" style={{ textAlign: 'center', paddingTop: '3.5rem', paddingLeft: '1.5rem', paddingRight: '1.5rem' }}>
+          <div className="details-status-body">
             <div className="state-icon-wrap state-icon-error" style={{ margin: '0 auto 1rem' }}>
               <AlertCircle size={28} />
             </div>
@@ -2061,21 +2300,23 @@ export default function App() {
       {routeProductCode && !loading && !errorMessage && !selectedProduct && (
         <div className="details-overlay">
           <header className="details-nav">
-            <button
-              className="btn-back-nav"
-              onClick={handleBackFromDetails}
-              aria-label="Voltar para a vitrine"
-            >
-              <ArrowLeft size={18} strokeWidth={2.5} />
-              <span>Voltar</span>
-            </button>
-            <span className="nav-center-info">
-              CÓD: {routeProductCode}
-            </span>
-            <div style={{ width: 80 }} />
+            <div className="details-nav-inner">
+              <button
+                className="btn-back-nav"
+                onClick={handleBackFromDetails}
+                aria-label="Voltar para a vitrine"
+              >
+                <ArrowLeft size={18} strokeWidth={2.5} />
+                <span>Voltar</span>
+              </button>
+              <span className="nav-center-info">
+                CÓD: {routeProductCode}
+              </span>
+              <div style={{ width: 80 }} />
+            </div>
           </header>
 
-          <div className="details-body" style={{ textAlign: 'center', paddingTop: '3.5rem', paddingLeft: '1.5rem', paddingRight: '1.5rem' }}>
+          <div className="details-status-body">
             <div className="state-icon-wrap state-icon-empty" style={{ margin: '0 auto 1rem' }}>
               <ShoppingBag size={28} />
             </div>
@@ -2099,144 +2340,182 @@ export default function App() {
       {selectedProduct && (
         <div className="details-overlay">
           <header className="details-nav">
-            <button
-              className="btn-back-nav"
-              onClick={handleBackFromDetails}
-              aria-label="Voltar para a vitrine"
-            >
-              <ArrowLeft size={18} strokeWidth={2.5} />
-              <span>Voltar</span>
-            </button>
-            <span className="nav-center-info">
-              CÓD: {selectedProduct.code}
-            </span>
-            <div style={{ width: 80 }} />
+            <div className="details-nav-inner">
+              <button
+                className="btn-back-nav"
+                onClick={handleBackFromDetails}
+                aria-label="Voltar para a vitrine"
+              >
+                <ArrowLeft size={18} strokeWidth={2.5} />
+                <span>Voltar</span>
+              </button>
+              <span className="nav-center-info">
+                CÓD: {selectedProduct.code}
+              </span>
+              <div style={{ width: 80 }} />
+            </div>
           </header>
 
           <div className="details-body">
-            <ProductGallery
-              mainImage={selectedProduct.image}
-              images={selectedProduct.images}
-              productName={selectedProduct.name}
-              productCode={selectedProduct.code}
-            />
-
-            <div className="details-info-section">
-              <div className="details-platform-row">
-                <span
-                  className={`platform-pill-badge ${getMarketplaceClass(selectedProduct.platform)}`}
-                >
-                  {selectedProduct.platform}
-                </span>
-
-                <div className="destination-badge">
-                  <ExternalLink size={13} strokeWidth={2.3} aria-hidden="true" />
-                  <span>Loja de destino</span>
-                </div>
+            <div className="details-layout-grid">
+              {/* GALERIA DINÂMICA (COLUNA ESQUERDA NO DESKTOP / TOPO NO MOBILE) */}
+              <div className="details-gallery-area">
+                <ProductGallery
+                  mainImage={selectedProduct.image}
+                  images={selectedProduct.images}
+                  productName={selectedProduct.name}
+                  productCode={selectedProduct.code}
+                />
               </div>
 
-              <div className="details-category-tag">
-                <Tag size={13} strokeWidth={2.2} aria-hidden="true" />
-                <span>{normalizeCategory(selectedProduct.category)}</span>
-              </div>
-
-              <h2 className="details-title">{selectedProduct.name}</h2>
-
-              {hasValidRating(selectedProduct) && (
-                <div className="details-reviews-row">
-                  <div className="stars-group">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        size={17}
-                        fill={i < Math.floor(Number(selectedProduct.rating)) ? '#f59e0b' : 'none'}
-                        color="#f59e0b"
-                        strokeWidth={2}
-                      />
-                    ))}
-                  </div>
-                  <span className="rating-score">{selectedProduct.rating}</span>
-                  <span className="reviews-count">
-                    ({selectedProduct.reviews} avaliações)
+              {/* BLOCO DE INFORMAÇÕES, PREÇOS E CTA (COLUNA DIREITA NO DESKTOP / SEQUÊNCIA NO MOBILE) */}
+              <div className="details-buy-area">
+                <div className="details-platform-row">
+                  <span
+                    className={`platform-pill-badge ${getMarketplaceClass(selectedProduct.platform)}`}
+                  >
+                    {selectedProduct.platform}
                   </span>
-                </div>
-              )}
 
-              <div className="details-pricing-card">
-                {selectedProduct.oldPrice && (
-                  <div className="details-old-price-line">
-                    De: R$ {selectedProduct.oldPrice}
+                  <div className="destination-badge">
+                    <ExternalLink size={13} strokeWidth={2.3} aria-hidden="true" />
+                    <span>Loja de destino</span>
+                  </div>
+                </div>
+
+                <div className="details-category-tag">
+                  <Tag size={13} strokeWidth={2.2} aria-hidden="true" />
+                  <span>{normalizeCategory(selectedProduct.category)}</span>
+                </div>
+
+                <h2 className="details-title">{selectedProduct.name}</h2>
+
+                {hasValidRating(selectedProduct) && (
+                  <div className="details-reviews-row">
+                    <div className="stars-group">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          size={17}
+                          fill={i < Math.floor(Number(selectedProduct.rating)) ? '#f59e0b' : 'none'}
+                          color="#f59e0b"
+                          strokeWidth={2}
+                        />
+                      ))}
+                    </div>
+                    <span className="rating-score">{selectedProduct.rating}</span>
+                    <span className="reviews-count">
+                      ({selectedProduct.reviews} avaliações)
+                    </span>
                   </div>
                 )}
-                <div className="details-main-price">
-                  <span className="curr">R$</span>
-                  <span className="amount">{selectedProduct.price}</span>
+
+                <div className="details-pricing-card">
+                  {selectedProduct.oldPrice && (
+                    <div className="details-old-price-line">
+                      De: R$ {selectedProduct.oldPrice}
+                    </div>
+                  )}
+                  <div className="details-main-price">
+                    <span className="curr">R$</span>
+                    <span className="amount">{selectedProduct.price}</span>
+                  </div>
+                  <div className="details-price-disclaimer">
+                    Preço e disponibilidade sujeitos a alterações na loja parceira.
+                  </div>
+
+                  {/* BLOCO DE AÇÃO (CTA PRINCIPAL + WHATSAPP SECUNDÁRIO) */}
+                  <div className="details-cta-block">
+                    {isSafeExternalUrl(selectedProduct.link) ? (
+                      <a
+                        href={selectedProduct.link.trim()}
+                        target="_blank"
+                        rel="noopener noreferrer sponsored"
+                        className="btn-cta-buy"
+                        aria-label={`${getMarketplaceOfferLabel(selectedProduct.platform)} (abre em nova aba)`}
+                      >
+                        <ShoppingBag size={20} strokeWidth={2.3} aria-hidden="true" />
+                        <span>{getMarketplaceOfferLabel(selectedProduct.platform)}</span>
+                        <ExternalLink size={16} strokeWidth={2.3} aria-hidden="true" />
+                      </a>
+                    ) : (
+                      <div
+                        className="btn-cta-unavailable"
+                        role="status"
+                        aria-disabled="true"
+                      >
+                        <AlertCircle size={18} strokeWidth={2.2} aria-hidden="true" />
+                        <span>Link da oferta indisponível no momento</span>
+                      </div>
+                    )}
+
+                    {/* BOTÃO SECUNDÁRIO: COMPARTILHAR NO WHATSAPP (VISUAL APENAS, DESABILITADO) */}
+                    <button
+                      type="button"
+                      className="btn-share-whatsapp-disabled"
+                      disabled
+                      aria-disabled="true"
+                      title="Compartilhamento em breve"
+                    >
+                      <MessageCircle size={17} strokeWidth={2.2} className="whatsapp-icon" aria-hidden="true" />
+                      <span>Compartilhar no WhatsApp</span>
+                      <span className="badge-coming-soon">Em breve</span>
+                    </button>
+                  </div>
+
+                  {/* TRÊS MICROINFORMAÇÕES INSTITUCIONAIS */}
+                  <div className="buybox-micro-row">
+                    <div className="buybox-micro-item">
+                      <Store size={14} strokeWidth={2.2} aria-hidden="true" />
+                      <span>Compra na plataforma parceira</span>
+                    </div>
+                    <div className="buybox-micro-item">
+                      <Truck size={14} strokeWidth={2.2} aria-hidden="true" />
+                      <span>Frete e prazo pela loja</span>
+                    </div>
+                    <div className="buybox-micro-item">
+                      <ShieldCheck size={14} strokeWidth={2.2} aria-hidden="true" />
+                      <span>Garantia conforme a oferta</span>
+                    </div>
+                  </div>
+
+                  {/* AVISO ÚNICO DE AFILIADOS */}
+                  <div className="buybox-affiliate-notice">
+                    <Info size={13} strokeWidth={2.2} aria-hidden="true" />
+                    <span>A Vitrine Oficial pode receber comissão por compras qualificadas.</span>
+                  </div>
                 </div>
-                <span className="details-price-badge">
-                  Preço e disponibilidade sujeitos à alteração na loja de destino
-                </span>
               </div>
 
+              {/* DESCRIÇÃO DO PRODUTO (ABAIXO DAS 2 COLUNAS NO DESKTOP / APÓS PREÇO NO MOBILE) */}
               {hasValidDescription(selectedProduct) && (
-                <div className="details-description-card">
-                  <h3 className="details-description-title">Descrição do produto</h3>
-                  <div className="details-description-text">
-                    {selectedProduct.description.split('\n').map((line, idx) => {
-                      const trimmed = line.trim();
-                      if (!trimmed) {
-                        return <div key={idx} className="details-description-spacer" />;
-                      }
-                      return (
-                        <p key={idx} className="details-description-paragraph">
-                          {trimmed}
-                        </p>
-                      );
-                    })}
+                <div className="details-description-area">
+                  <div className="details-description-card">
+                    <h3 className="details-description-title">Descrição do produto</h3>
+                    <div className="details-description-text">
+                      {selectedProduct.description.split('\n').map((line, idx) => {
+                        const trimmed = line.trim();
+                        if (!trimmed) {
+                          return <div key={idx} className="details-description-spacer" />;
+                        }
+                        return (
+                          <p key={idx} className="details-description-paragraph">
+                            {trimmed}
+                          </p>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
-
-              <div className="security-card">
-                <div className="security-icon-circle" aria-hidden="true">
-                  <Info size={20} strokeWidth={2.3} />
-                </div>
-                <div className="security-text-box">
-                  <h4>Compra realizada na loja de destino</h4>
-                  <p>
-                    A Vitrine Oficial divulga produtos de lojas e marketplaces. Ao acessar a oferta, a compra, o pagamento e a entrega ocorrem diretamente em {selectedProduct.platform || 'loja parceira'}, conforme as condições da própria plataforma. Alguns links são de afiliados, e podemos receber comissão por compras qualificadas.
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* BARRA FIXA INFERIOR (BOTTOM BAR) */}
-          <aside className="bottom-action-bar">
-            <div className="bottom-bar-inner">
-              {isSafeExternalUrl(selectedProduct.link) ? (
-                <a
-                  href={selectedProduct.link.trim()}
-                  target="_blank"
-                  rel="noopener noreferrer sponsored"
-                  className="btn-cta-buy"
-                  aria-label={`${getMarketplaceOfferLabel(selectedProduct.platform)} (abre em nova aba)`}
-                >
-                  <ShoppingBag size={22} strokeWidth={2.5} aria-hidden="true" />
-                  <span>{getMarketplaceOfferLabel(selectedProduct.platform)}</span>
-                  <ExternalLink size={18} strokeWidth={2.5} aria-hidden="true" />
-                </a>
-              ) : (
-                <div
-                  className="btn-cta-unavailable"
-                  role="status"
-                  aria-disabled="true"
-                >
-                  <AlertCircle size={18} strokeWidth={2.2} aria-hidden="true" />
-                  <span>Link da oferta indisponível no momento</span>
-                </div>
-              )}
-            </div>
-          </aside>
+          {/* RODAPÉ INSTITUCIONAL (FINAL DO FLUXO DE ROLAGEM) */}
+          <Footer
+            onSelectCategory={handleFooterCategoryClick}
+            onGoHome={handleFooterHomeClick}
+          />
         </div>
       )}
     </div>
