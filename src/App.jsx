@@ -1072,8 +1072,8 @@ const cssStyles = `
     text-align: center;
   }
 
-  /* Botão Secundário WhatsApp (Visual apenas, desabilitado) */
-  .btn-share-whatsapp-disabled {
+  /* Botão Secundário WhatsApp (Compartilhamento ativo) */
+  .btn-share-whatsapp {
     width: 100%;
     box-sizing: border-box;
     background: #ffffff;
@@ -1088,26 +1088,30 @@ const cssStyles = `
     align-items: center;
     justify-content: center;
     gap: 0.55rem;
-    cursor: not-allowed;
-    opacity: 0.9;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
     user-select: none;
   }
 
-  .btn-share-whatsapp-disabled .whatsapp-icon {
-    color: #16A34A;
-    flex-shrink: 0;
+  .btn-share-whatsapp:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #0F172A;
   }
 
-  .btn-share-whatsapp-disabled .badge-coming-soon {
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+  .btn-share-whatsapp:focus-visible {
+    outline: 2px solid #16A34A;
+    outline-offset: 2px;
+  }
+
+  .btn-share-whatsapp:active {
     background: #f1f5f9;
-    color: #64748b;
-    padding: 0.2rem 0.5rem;
-    border-radius: 9999px;
-    margin-left: 0.25rem;
+  }
+
+  .btn-share-whatsapp .whatsapp-icon {
+    color: #16A34A;
+    flex-shrink: 0;
   }
 
   /* Microinformações Institucionais da Buy Box */
@@ -1342,6 +1346,38 @@ function parseProductRoute(pathname) {
   } catch {
     return match[1].trim() || null;
   }
+}
+
+/**
+ * Constrói a URL oficial de compartilhamento no WhatsApp para o produto informado.
+ * Utiliza o formato documentado: https://wa.me/?text=MENSAGEM_CODIFICADA
+ * Não inclui preços nem links de afiliados; conduz à página individual do produto na Vitrine.
+ */
+function buildWhatsAppShareUrl(product) {
+  if (!product || !product.code) return '#';
+
+  const origin = typeof window !== 'undefined' && window.location?.origin
+    ? window.location.origin
+    : '';
+
+  const productCode = String(product.code).trim();
+  const productUrl = `${origin}/produto/${encodeURIComponent(productCode)}`;
+  const productName = typeof product.name === 'string' ? product.name.trim() : '';
+
+  const message = [
+    '🛍️ Olha essa oferta que encontrei na Vitrine Oficial!',
+    '',
+    productName,
+    '',
+    `Código: ${productCode}`,
+    '',
+    'Confira a oferta:',
+    productUrl,
+    '',
+    'Preço e disponibilidade sujeitos a alterações na loja parceira.'
+  ].join('\n');
+
+  return `https://wa.me/?text=${encodeURIComponent(message)}`;
 }
 
 export default function App() {
@@ -2449,18 +2485,17 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* BOTÃO SECUNDÁRIO: COMPARTILHAR NO WHATSAPP (VISUAL APENAS, DESABILITADO) */}
-                    <button
-                      type="button"
-                      className="btn-share-whatsapp-disabled"
-                      disabled
-                      aria-disabled="true"
-                      title="Compartilhamento em breve"
+                    {/* BOTÃO SECUNDÁRIO: COMPARTILHAR NO WHATSAPP */}
+                    <a
+                      href={buildWhatsAppShareUrl(selectedProduct)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-share-whatsapp"
+                      aria-label="Compartilhar oferta no WhatsApp (abre em nova aba)"
                     >
                       <MessageCircle size={17} strokeWidth={2.2} className="whatsapp-icon" aria-hidden="true" />
                       <span>Compartilhar no WhatsApp</span>
-                      <span className="badge-coming-soon">Em breve</span>
-                    </button>
+                    </a>
                   </div>
 
                   {/* TRÊS MICROINFORMAÇÕES INSTITUCIONAIS */}
