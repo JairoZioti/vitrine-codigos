@@ -185,13 +185,19 @@ export function resolveCanonicalOrigin(req) {
 }
 
 /**
- * Consulta segura ao Supabase REST utilizando apenas a chave anônima pública e RLS.
+ * Consulta segura ao Supabase REST utilizando apenas a chave pública (publishable ou anon) e RLS.
+ * Suporta o formato moderno (VITE_SUPABASE_PUBLISHABLE_KEY / sb_publishable_...) e o legado (VITE_SUPABASE_ANON_KEY).
+ * Chaves sb_publishable_ são enviadas exclusivamente via cabeçalho 'apikey', sem Authorization: Bearer.
  */
 export async function fetchActiveProduct(code) {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  const publicKey =
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (!supabaseUrl || !publicKey) {
     const err = new Error('Variáveis do Supabase ausentes no runtime da Vercel Function.');
     err.code = 'CONFIG_MISSING';
     throw err;
@@ -204,13 +210,20 @@ export async function fetchActiveProduct(code) {
   const timeoutId = setTimeout(() => controller.abort(), 4500); // 4.5s timeout resiliente
 
   try {
+    const headers = {
+      'apikey': publicKey,
+      'Accept': 'application/json'
+    };
+
+    // Chaves públicas modernas (sb_publishable_...) NÃO devem ser enviadas como Bearer JWT.
+    // Apenas se a chave for explicitamente um token JWT legado (iniciado por 'ey') o header Authorization é adicionado.
+    if (publicKey.startsWith('ey')) {
+      headers['Authorization'] = `Bearer ${publicKey}`;
+    }
+
     const response = await fetch(endpoint, {
       method: 'GET',
-      headers: {
-        'apikey': supabaseAnonKey,
-        'Authorization': `Bearer ${supabaseAnonKey}`,
-        'Accept': 'application/json'
-      },
+      headers,
       signal: controller.signal
     });
 
