@@ -1,5 +1,14 @@
 {
+  "functions": {
+    "api/product-preview.js": {
+      "includeFiles": "dist/index.html"
+    }
+  },
   "rewrites": [
+    {
+      "source": "/produto/:code",
+      "destination": "/api/product-preview?code=:code"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
